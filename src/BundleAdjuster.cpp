@@ -3,7 +3,7 @@
 
 BundleAdjuster::BundleAdjuster() {}
 
-Sophus::SE3 BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3 pose,int iteration_times){
+Sophus::SE3d BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3d pose,int iteration_times){
        /*  Motion BA  TEST*/
 
 //       Eigen::Matrix3d K;
@@ -15,7 +15,7 @@ Sophus::SE3 BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<c
       std::cout<<"error here "<<p3d.size()<<" "<<p2d.size()<<std::endl;
       double cost = 0, lastCost = 0;
       int nPoints = p3d.size();
-      Sophus::SE3 T_esti; // estimated pose
+      Sophus::SE3d T_esti; // estimated pose
       T_esti=pose;
       for (int iter = 0; iter < iterations; iter++) {
 
@@ -104,7 +104,7 @@ Sophus::SE3 BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<c
 
        // update your estimation
        // START YOUR CODE HERE
-       T_esti=Sophus::SE3::exp(dx)*T_esti;
+       T_esti=Sophus::SE3d::exp(dx)*T_esti;
        // cout<<"the new T_esti: "<<T_esti<<endl;
        // END YOUR CODE HERE
 

@@ -1,7 +1,7 @@
 #include "VisualSLAM.h"
-//#include "VisualOdometry.h"
+#include <opencv2/viz/viz3d.hpp>
 
-void visualization_pose(std::vector<Sophus::SE3> POSE )
+void visualization_pose(std::vector<Sophus::SE3d> POSE )
 {
     cv::viz::Viz3d vis("Visual Odometry");
     cv::viz::WCoordinateSystem world_coor(1.0), camera_coor(0.5);
@@ -15,19 +15,14 @@ void visualization_pose(std::vector<Sophus::SE3> POSE )
     vis.showWidget( "Camera", camera_coor );
     for ( int i=0; i<POSE.size(); i++ )
     {
-        Sophus::SE3 Tcw = POSE[i].inverse();
+        Sophus::SE3d Tcw = POSE[i].inverse();
 
         // show the map and the camera pose
-        cv::Affine3d M(
-            cv::Affine3d::Mat3(
-                Tcw.rotation_matrix()(0,0), Tcw.rotation_matrix()(0,1), Tcw.rotation_matrix()(0,2),
-                Tcw.rotation_matrix()(1,0), Tcw.rotation_matrix()(1,1), Tcw.rotation_matrix()(1,2),
-                Tcw.rotation_matrix()(2,0), Tcw.rotation_matrix()(2,1), Tcw.rotation_matrix()(2,2)
-            ),
-            cv::Affine3d::Vec3(
-                Tcw.translation()(0,0), Tcw.translation()(1,0), Tcw.translation()(2,0)
-            )
-        );
+        cv::Mat R, t;
+        cv::eigen2cv(Tcw.so3().matrix(), R);
+        cv::eigen2cv(Tcw.translation(), t);
+        cv::Affine3d M(R,t);
+
         vis.setWidgetPose( "Camera", M);
         vis.spinOnce(300, false);      // time of each picture  it is better more than 300
       }
@@ -87,17 +82,10 @@ int main(int argc, char** argv){
 
         if(slam.VO.Esti_pose_vector.size()>20) // greater than 22 picture
         {
-           std::vector<Sophus::SE3> poses=slam.VO.Esti_pose_vector;
+           std::vector<Sophus::SE3d> poses=slam.VO.Esti_pose_vector;
            visualization_pose(poses);
          }
+    }
 
-        /*
-		if (i % params.getNumImagesBA() == 0){
-			slam.runBackEndRoutine();
-			slam.update();
-		}
-		*/
-	}
-
-	return 0;
+    return 0;
 }
