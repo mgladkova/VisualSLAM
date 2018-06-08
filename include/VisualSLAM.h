@@ -9,7 +9,7 @@ class VisualSLAM {
 private:
 	Map map;
         BundleAdjuster BA;
-	VisualOdometry VO;
+//	VisualOdometry VO;
 
 public:
 	VisualSLAM();
@@ -17,5 +17,6 @@ public:
 	void performFrontEndStep(cv::Mat left_image, cv::Mat right_image); // feature detection / tracking and matching 
 	void runBackEndRoutine(); // optimization over parameters.numImagesBundleAdjustment images
 	void update(); // update map and poses
+        VisualOdometry VO;
 
 };

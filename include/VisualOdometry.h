@@ -50,4 +50,6 @@ class VisualOdometry {
                 void estimatePose3D2D(std::vector<cv::KeyPoint> keypoints, std::vector<cv::DMatch> matches);
                 void estimatePose2D2D(std::vector<cv::KeyPoint> keypoints, std::vector<cv::DMatch> matches);
                 void trackFeatures();
+                std::vector<Sophus::SE3> Esti_pose_vector;
+
 };
