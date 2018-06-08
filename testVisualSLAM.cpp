@@ -1,4 +1,59 @@
 #include "VisualSLAM.h"
+//#include "VisualOdometry.h"
+
+void visualization_pose(std::vector<Sophus::SE3> POSE )
+{
+    cv::viz::Viz3d vis("Visual Odometry");
+    cv::viz::WCoordinateSystem world_coor(1.0), camera_coor(0.5);
+    cv::Point3d cam_pos( 0, -1.0, -1.0 ), cam_focal_point(0,0,0), cam_y_dir(0,1,0);
+    cv::Affine3d cam_pose = cv::viz::makeCameraPose( cam_pos, cam_focal_point, cam_y_dir );
+    vis.setViewerPose( cam_pose );
+
+    world_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 2.0);
+    camera_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 1.0);
+    vis.showWidget( "World", world_coor );
+    vis.showWidget( "Camera", camera_coor );
+
+//    cout<<"read total "<<rgb_files.size() <<" entries"<<endl;
+    for ( int i=0; i<POSE.size(); i++ )
+    {
+//        Mat color = cv::imread ( rgb_files[i] );
+//        Mat depth = cv::imread ( depth_files[i], -1 );
+//        if ( color.data==nullptr || depth.data==nullptr )
+//            break;
+//        myslam::Frame::Ptr pFrame = myslam::Frame::createFrame();
+//        pFrame->camera_ = camera;
+//        pFrame->color_ = color;
+//        pFrame->depth_ = depth;
+//        pFrame->time_stamp_ = rgb_times[i];
+
+//        boost::timer timer;
+//        vo->addFrame ( pFrame );
+//        cout<<"VO costs time: "<<timer.elapsed()<<endl;
+
+//        if ( vo->state_ == myslam::VisualOdometry::LOST )
+//            break;
+        Sophus::SE3 Tcw = POSE[i].inverse();
+
+        // show the map and the camera pose
+        cv::Affine3d M(
+            cv::Affine3d::Mat3(
+                Tcw.rotation_matrix()(0,0), Tcw.rotation_matrix()(0,1), Tcw.rotation_matrix()(0,2),
+                Tcw.rotation_matrix()(1,0), Tcw.rotation_matrix()(1,1), Tcw.rotation_matrix()(1,2),
+                Tcw.rotation_matrix()(2,0), Tcw.rotation_matrix()(2,1), Tcw.rotation_matrix()(2,2)
+            ),
+            cv::Affine3d::Vec3(
+                Tcw.translation()(0,0), Tcw.translation()(1,0), Tcw.translation()(2,0)
+            )
+        );
+
+//        cv::imshow("image", color );
+//                    cv::waitKey(1);
+        vis.setWidgetPose( "Camera", M);
+        vis.spinOnce(300, false);      // time of each picture  it is better more than 300
+      }
+
+}
 
 int main(int argc, char** argv){
 
@@ -42,12 +97,24 @@ int main(int argc, char** argv){
 			throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
 		}
 
-		cv::imshow("Image_left", image_left);
-		cv::imshow("Image_right", image_right);
-		cv::waitKey(0);
+//		cv::imshow("Image_left", image_left);
+//		cv::imshow("Image_right", image_right);
+//		cv::waitKey(0);
         std::cout<<"pose:"<<i<<std::endl;
 		slam.performFrontEndStep(image_left, image_right);
         std::cout<<i<<std::endl;
+
+         // visualization
+
+        if(slam.VO.Esti_pose_vector.size()>20) // greater than 22 picture
+        {
+           std::vector<Sophus::SE3> poses=slam.VO.Esti_pose_vector;
+           visualization_pose(poses);
+         }
+
+
+
+        cv::waitKey(0);
         /*
 		if (i % params.getNumImagesBA() == 0){
 			slam.runBackEndRoutine();
