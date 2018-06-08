@@ -13,26 +13,8 @@ void visualization_pose(std::vector<Sophus::SE3> POSE )
     camera_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 1.0);
     vis.showWidget( "World", world_coor );
     vis.showWidget( "Camera", camera_coor );
-
-//    cout<<"read total "<<rgb_files.size() <<" entries"<<endl;
     for ( int i=0; i<POSE.size(); i++ )
     {
-//        Mat color = cv::imread ( rgb_files[i] );
-//        Mat depth = cv::imread ( depth_files[i], -1 );
-//        if ( color.data==nullptr || depth.data==nullptr )
-//            break;
-//        myslam::Frame::Ptr pFrame = myslam::Frame::createFrame();
-//        pFrame->camera_ = camera;
-//        pFrame->color_ = color;
-//        pFrame->depth_ = depth;
-//        pFrame->time_stamp_ = rgb_times[i];
-
-//        boost::timer timer;
-//        vo->addFrame ( pFrame );
-//        cout<<"VO costs time: "<<timer.elapsed()<<endl;
-
-//        if ( vo->state_ == myslam::VisualOdometry::LOST )
-//            break;
         Sophus::SE3 Tcw = POSE[i].inverse();
 
         // show the map and the camera pose
@@ -46,9 +28,6 @@ void visualization_pose(std::vector<Sophus::SE3> POSE )
                 Tcw.translation()(0,0), Tcw.translation()(1,0), Tcw.translation()(2,0)
             )
         );
-
-//        cv::imshow("image", color );
-//                    cv::waitKey(1);
         vis.setWidgetPose( "Camera", M);
         vis.spinOnce(300, false);      // time of each picture  it is better more than 300
       }
@@ -97,9 +76,9 @@ int main(int argc, char** argv){
 			throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
 		}
 
-//		cv::imshow("Image_left", image_left);
-//		cv::imshow("Image_right", image_right);
-//		cv::waitKey(0);
+        cv::imshow("Image_left", image_left);
+        cv::imshow("Image_right", image_right);
+        cv::waitKey(0);
         std::cout<<"pose:"<<i<<std::endl;
 		slam.performFrontEndStep(image_left, image_right);
         std::cout<<i<<std::endl;
@@ -112,9 +91,6 @@ int main(int argc, char** argv){
            visualization_pose(poses);
          }
 
-
-
-        cv::waitKey(0);
         /*
 		if (i % params.getNumImagesBA() == 0){
 			slam.runBackEndRoutine();
