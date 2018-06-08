@@ -3,7 +3,7 @@
 
 BundleAdjuster::BundleAdjuster() {}
 
-void BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3 pose,int iteration_times){
+Sophus::SE3 BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3 pose,int iteration_times){
        /*  Motion BA  TEST*/
 
 //       Eigen::Matrix3d K;
@@ -22,7 +22,7 @@ void BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Poin
        Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 6, 6>::Zero();
        typedef Eigen::Matrix<double, 6, 1> Vector6d;
        Vector6d b = Vector6d::Zero();
-       std::cout<<"the T_esti: "<<T_esti.matrix()<<std::endl;
+//       std::cout<<"the T_esti: "<<T_esti.matrix()<<std::endl;
        cost = 0;
        // compute cost
        for (int i = 0; i < nPoints; i++) {
@@ -77,7 +77,7 @@ void BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Poin
            cost = cost + 1./2 *(e[0]*e[0]+e[1]*e[1]);
            // cout<<"cost on line is : "<<cost<<endl;
        }
-       std::cout<<"cost is :"<<cost<<std::endl;
+//       std::cout<<"cost is :"<<cost<<std::endl;
        // while(1) {}
        // solve dx
        Vector6d dx;
@@ -114,6 +114,6 @@ void BundleAdjuster::Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Poin
        // std::cout << "estimated pose: \n" << T_esti.matrix() << std::endl;
 
        }
-
-       std::cout << "estimated pose: \n" << T_esti.matrix() << std::endl;
+return T_esti;
+//       std::cout << "estimated pose: \n" << T_esti.matrix() << std::endl;
 }

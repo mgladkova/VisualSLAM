@@ -42,7 +42,7 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
 
 	std::vector<cv::DMatch> matches = VO.findGoodORBFeatureMatches(keypoints_new, descriptors_new);
     std::cout<<"Disparity map:"<<std::endl;
-    cv::imshow("Disparity map", disparity_map);
+//    cv::imshow("Disparity map", disparity_map);
 
 	// Draw top matches
     /*cv::Mat imMatches;

@@ -107,16 +107,16 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::KeyPoint> keypoints_new, s
         cv::cv2eigen(tvec,t);
     }
     pose = Sophus::SE3(R, t);
-    std::cout << "Pose: "<<std::endl<< pose.matrix() << std::endl;
+    std::cout << "3D-2D Pnp solved Pose: "<<std::endl<< pose.matrix() << std::endl;
 
-
+    // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
     Eigen::Matrix3d K_;
     K_<<cam.fx, 0, cam.cx, 0, cam.fy, cam.cy, 0, 0, 1;
     int iteration_times=10;
     BundleAdjuster motion_ba;
-    motion_ba.Motion_BA(p3d,p2d,K_,pose,iteration_times);
-    // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
-//    Motion_BA(p3d,p2d,K_,pose,iteration_times);
+    Sophus::SE3 Esti_pose=motion_ba.Motion_BA(p3d,p2d,K_,pose,iteration_times);
+    Esti_pose_vector.push_back(Esti_pose);
+    std::cout<<"After motion ba the Esti_pose is:"<<std::endl<<Esti_pose_vector[0].matrix()<<std::endl;
 
 }
 
