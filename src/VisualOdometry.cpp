@@ -162,13 +162,13 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::KeyPoint> keypoints_new, s
     //computeAndShowPointCloud(refFrame.image, refFrame.disparity_map, b);
 
     double data[] = {cam.fx, 0, cam.cx, 0, cam.fy, cam.cy, 0, 0, 1};
-    cv::Mat cameraMatrix = cv::Mat(3, 3, CV_32F, data);
-    cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_32F);
+    cv::Mat cameraMatrix = cv::Mat(3, 3, CV_64F, data);
+    cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
     cv::Mat rvec,tvec,rot_matrix;
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
     Eigen::Vector3d t(0,0,0);
 
-    bool result=cv::solvePnP(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
+    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
 
     if (result){
         cv::Rodrigues(rvec, rot_matrix);

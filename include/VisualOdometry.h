@@ -18,10 +18,10 @@
 //#include "BundleAdjuster.h"
 
 struct Camera {
-	double fx;
-	double fy;
-	double cx;
-	double cy;
+    double fx;
+    double fy;
+    double cx;
+    double cy;
 };
 
 struct KeyFrame {
