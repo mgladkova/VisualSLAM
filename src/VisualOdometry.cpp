@@ -33,39 +33,42 @@ KeyFrame VisualOdometry::getReferenceFrame() const {
     return refFrame;
 }
 
+static int k = 0;
+
 cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat image_right){
-    cv::Mat disparity, disparity_norm;
-    int number_of_disparities = 16*8;
+    cv::Mat disparity, true_dmap, disparity_norm;
+    int min_disparity = 0;
+    int number_of_disparities = 16*6 - min_disparity;
     int kernel_size = 7;
 
-    cv::Ptr<cv::stereo::StereoBinarySGBM> sgbm = cv::stereo::StereoBinarySGBM::create(0, number_of_disparities, kernel_size);
+    cv::Ptr<cv::stereo::StereoBinarySGBM> sgbm = cv::stereo::StereoBinarySGBM::create(min_disparity, number_of_disparities, kernel_size);
     // setting the penalties for sgbm
-    sgbm->setP1(10);
-    sgbm->setP2(240);
-    sgbm->setMinDisparity(4);
-    sgbm->setUniquenessRatio(4);
-    sgbm->setSpeckleWindowSize(45);
-    sgbm->setSpeckleRange(2);
+    sgbm->setP1(8*std::pow(kernel_size, 2));
+    sgbm->setP2(32*std::pow(kernel_size, 2));
+    sgbm->setMinDisparity(min_disparity);
+    sgbm->setUniquenessRatio(3);
+    sgbm->setSpeckleWindowSize(200);
+    sgbm->setSpeckleRange(32);
     sgbm->setDisp12MaxDiff(1);
-    sgbm->setBinaryKernelType(CV_8UC1);
     sgbm->setSpekleRemovalTechnique(cv::stereo::CV_SPECKLE_REMOVAL_AVG_ALGORITHM);
     sgbm->setSubPixelInterpolationMethod(cv::stereo::CV_SIMETRICV_INTERPOLATION);
     sgbm->compute(image_left, image_right, disparity);
-    double minVal; double maxVal;
-    minMaxLoc(disparity, &minVal, &maxVal);
-    disparity.convertTo(disparity_norm, CV_8U, 255 / (maxVal - minVal));
-    return disparity_norm;
+
+    disparity.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
+    cv::imwrite("disparity_map" + std::to_string(k++) + ".png", true_dmap);
+    cv::imshow("disparity", (true_dmap - min_disparity)/number_of_disparities);
+    return true_dmap;
 }
 
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
-    int max_features = 400;
+    int max_features = 600;
 	// Detect ORB features and compute descriptors.
     cv::Ptr<cv::Feature2D> orb = cv::ORB::create(max_features);
     orb->detectAndCompute(frame_new, cv::Mat(), keypoints_new, descriptors_new);
 }
 
 std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new){
-    float good_match_ratio = 0.8;
+    float good_match_ratio = 0.5;
     std::vector<cv::DMatch> matches;
     cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce");
     matcher->match(refFrame.descriptor, descriptors_new, matches, cv::Mat());
@@ -80,18 +83,22 @@ std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv
 void VisualOdometry::estimatePose3D2D(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches){
     std::vector<cv::Point2d> p2d;
     std::vector<cv::Point3d> p3d;
-    float depth_scale = 100.f;
+
+    double b = 0.573;
+    double f = (cam.fx + cam.fy) / 2;
 	// prepare data
     for (auto &m: matches) {
         cv::Point2d p1 = refFrame.keypoints[m.queryIdx].pt;
         cv::Point2d p2 = keypoints_new[m.trainIdx].pt;
-        double depth = refFrame.disparity_map.at<uint8_t>(p1.y, p1.x) / depth_scale;
-        if (depth){
-           double x = depth*(p1.x - cam.cx) / cam.fx;
-           double y = depth*(p1.y - cam.cy) / cam.fy;
-           cv::Point3d p2_3d(x, y, depth);
-           p3d.push_back(p2_3d);
-           p2d.push_back(p1);
+        float disparity = refFrame.disparity_map.at<float>(p1.y, p1.x);
+        if (disparity){
+           double z = f*b/disparity;
+           double x = z*(p1.x - cam.cx) / cam.fx;
+           double y = z*(p1.y - cam.cy) / cam.fy;
+           std::cout << x << " " << y << " " << z << std::endl;
+           cv::Point3d p1_3d(x, y, z);
+           p3d.push_back(p1_3d);
+           p2d.push_back(p2);
         }
     }
     double data[] = {cam.fx, 0, cam.cx, 0, cam.fy, cam.cy, 0, 0, 1};
@@ -99,8 +106,10 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::KeyPoint> keypoints_new, s
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_32F);
     cv::Mat rvec,tvec,rot_matrix;
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
-    Eigen::Vector3d t;
-    bool result=cv::solvePnP(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, CV_EPNP);
+    Eigen::Vector3d t(0,0,0);
+    std::vector<cv::Point2d> inliers;
+    bool result=cv::solvePnP(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
+    std::cout << inliers.size() << std::endl;
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
         cv::cv2eigen(rot_matrix, R);
@@ -145,8 +154,9 @@ void VisualOdometry::estimatePose2D2D(std::vector<cv::KeyPoint> keypoints_new, s
 
     cv::cv2eigen(rot_matrix, R);
     cv::cv2eigen(tvec,t);
-
-    pose = Sophus::SE3d(R.transpose(), -R.transpose()*t);
+    std::cout << R << std::endl;
+    std::cout << t << std::endl;
+    pose = Sophus::SE3d(R, t);
 }
 
 void VisualOdometry::trackFeatures(){
