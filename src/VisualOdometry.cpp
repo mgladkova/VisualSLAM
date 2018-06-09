@@ -35,7 +35,7 @@ KeyFrame VisualOdometry::getReferenceFrame() const {
 
 static int k = 0;
 
-cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat image_right){
+/*cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat image_right){
     cv::Mat disparity, true_dmap, disparity_norm;
     int min_disparity = 0;
     int number_of_disparities = 16*6 - min_disparity;
@@ -57,6 +57,63 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
     disparity.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
     cv::imwrite("disparity_map" + std::to_string(k++) + ".png", true_dmap);
     cv::imshow("disparity", (true_dmap - min_disparity)/number_of_disparities);
+    return true_dmap;
+}*/
+
+cv::Rect computeROI(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance)
+{
+    int min_disparity = matcher_instance->getMinDisparity();
+    int num_disparities = matcher_instance->getNumDisparities();
+    int block_size = matcher_instance->getBlockSize();
+
+    int bs2 = block_size/2;
+    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
+
+    int xmin = maxD + bs2;
+    int xmax = src_sz.width + minD - bs2;
+    int ymin = bs2;
+    int ymax = src_sz.height - bs2;
+
+    cv::Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
+    return r;
+}
+
+cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat image_right){
+    cv::Mat disparity, true_dmap, disparity_norm;
+    cv::Rect ROI;
+    int min_disparity = 0;
+    int number_of_disparities = 16*6 - min_disparity;
+    int kernel_size = 7;
+
+    cv::Ptr<cv::stereo::StereoBinarySGBM> sgbm = cv::stereo::StereoBinarySGBM::create(min_disparity, number_of_disparities, kernel_size);
+    // setting the penalties for sgbm
+    sgbm->setP1(8*std::pow(kernel_size, 2));
+    sgbm->setP2(32*std::pow(kernel_size, 2));
+    sgbm->setMinDisparity(min_disparity);
+    sgbm->setUniquenessRatio(3);
+    sgbm->setSpeckleWindowSize(200);
+    sgbm->setSpeckleRange(32);
+    sgbm->setDisp12MaxDiff(1);
+    sgbm->setSpekleRemovalTechnique(cv::stereo::CV_SPECKLE_REMOVAL_AVG_ALGORITHM);
+    sgbm->setSubPixelInterpolationMethod(cv::stereo::CV_SIMETRICV_INTERPOLATION);
+
+    // setting the penalties for sgbm
+    ROI = computeROI(image_left.size(),sgbm);
+    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
+    wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
+    wls_filter->setDepthDiscontinuityRadius(1);
+
+    sgbm->compute(image_left, image_right, disparity);
+    wls_filter->setLambda(8000.0);
+    wls_filter->setSigmaColor(1.5);
+    wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
+
+    cv::Mat filtered_disp_vis;
+    cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
+    cv::namedWindow("filtered disparity", cv::WINDOW_AUTOSIZE);
+    cv::imshow("filtered disparity", filtered_disp_vis);
+    cv::waitKey();
+    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
     return true_dmap;
 }
 
@@ -95,21 +152,24 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::KeyPoint> keypoints_new, s
            double z = f*b/disparity;
            double x = z*(p1.x - cam.cx) / cam.fx;
            double y = z*(p1.y - cam.cy) / cam.fy;
-           std::cout << x << " " << y << " " << z << std::endl;
+           //std::cout << x << " " << y << " " << z << std::endl;
            cv::Point3d p1_3d(x, y, z);
            p3d.push_back(p1_3d);
            p2d.push_back(p2);
         }
     }
+
+    //computeAndShowPointCloud(refFrame.image, refFrame.disparity_map, b);
+
     double data[] = {cam.fx, 0, cam.cx, 0, cam.fy, cam.cy, 0, 0, 1};
     cv::Mat cameraMatrix = cv::Mat(3, 3, CV_32F, data);
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_32F);
     cv::Mat rvec,tvec,rot_matrix;
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
     Eigen::Vector3d t(0,0,0);
-    std::vector<cv::Point2d> inliers;
+
     bool result=cv::solvePnP(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
-    std::cout << inliers.size() << std::endl;
+
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
         cv::cv2eigen(rot_matrix, R);
@@ -161,4 +221,58 @@ void VisualOdometry::estimatePose2D2D(std::vector<cv::KeyPoint> keypoints_new, s
 
 void VisualOdometry::trackFeatures(){
 	// TODO
+}
+
+void VisualOdometry::computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity, const float baseline) {
+    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>> pointcloud;
+
+    // TODO Compute point cloud using disparity
+    // NOTE if your computer is slow, change v++ and u++ to v++2 and u+=2 to generate a sparser point cloud
+    for (int v = 0; v < image_left.rows; v++)
+        for (int u = 0; u < image_left.cols; u++) {
+            /// start your code here (~6 lines)
+
+            double z = cam.fx*baseline/(disparity.at<float>(v,u));
+            double x = (u - cam.cx)*z / cam.fx;
+            double y = (v - cam.cy)*z / cam.fy;
+
+            Eigen::Vector4d point(x, y, z,
+                           image_left.at<uchar>(v, u) / 255.0); // first three components are XYZ and the last is color
+            pointcloud.push_back(point);
+            /// end your code here
+        }
+
+    // draw the point cloud
+
+    pangolin::CreateWindowAndBind("Point Cloud Viewer", 1024, 768);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    pangolin::OpenGlRenderState s_cam(
+            pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
+            pangolin::ModelViewLookAt(0, -0.1, -1.8, 0, 0, 0, 0.0, -1.0, 0.0)
+    );
+
+    pangolin::View &d_cam = pangolin::CreateDisplay()
+            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
+            .SetHandler(new pangolin::Handler3D(s_cam));
+
+    while (pangolin::ShouldQuit() == false) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        d_cam.Activate(s_cam);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+        glPointSize(2);
+        glBegin(GL_POINTS);
+        for (auto &p: pointcloud) {
+            glColor3f(p[3], p[3], p[3]);
+            glVertex3d(p[0], p[1], p[2]);
+        }
+        glEnd();
+        pangolin::FinishFrame();
+        usleep(5000);   // sleep 5 ms
+    }
+    return;
 }

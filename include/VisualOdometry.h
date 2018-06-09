@@ -1,6 +1,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <sophus/se3.hpp>
+#include <opencv2/ximgproc/disparity_filter.hpp>
+#include <pangolin/pangolin.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -11,6 +13,7 @@
 
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 //#include "BundleAdjuster.h"
 
@@ -50,6 +53,7 @@ class VisualOdometry {
         void estimatePose3D2D(std::vector<cv::KeyPoint> keypoints, std::vector<cv::DMatch> matches);
         void estimatePose2D2D(std::vector<cv::KeyPoint> keypoints, std::vector<cv::DMatch> matches);
         void trackFeatures();
+        void computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity, const float baseline);
         std::vector<Sophus::SE3d> Esti_pose_vector;
 
 };
