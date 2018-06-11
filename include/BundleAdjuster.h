@@ -19,6 +19,6 @@ class BundleAdjuster {
 
 public:
         BundleAdjuster();
-        Sophus::SE3d Motion_BA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3d pose,int iteration_times);
+        Sophus::SE3d optimizeLocalPoseBA(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3d pose,int iteration_times);
 
 };

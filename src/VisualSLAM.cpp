@@ -52,8 +52,7 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
     std::vector<cv::KeyPoint> keypoints_new;
 	cv::Mat descriptors_new;
 
-	VO.extractORBFeatures(image_left, keypoints_new, descriptors_new);
-
+    VO.extractORBFeatures(image_left, keypoints_new, descriptors_new);
     KeyFrame refFrame = VO.getReferenceFrame();
     cv::Mat disparity_map = VO.getDisparityMap(image_left, image_right);
 
@@ -65,11 +64,11 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
 	std::vector<cv::DMatch> matches = VO.findGoodORBFeatureMatches(keypoints_new, descriptors_new);
 
 	// Draw top matches
-    /*
+
     cv::Mat imMatches;
     cv::drawMatches(refFrame.image, refFrame.keypoints, image_left, keypoints_new, matches, imMatches);
     cv::imshow("Matches", imMatches);
-    */
+    cv::waitKey(0);
 
     std::vector<cv::Point3d> p3d_prevFrame;
     std::vector<cv::Point2d> p2d_currFrame;
@@ -80,10 +79,9 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
 
 
     // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
-    int iteration_times=10;
-    Sophus::SE3d new_pose = BA.Motion_BA(p3d_prevFrame,p2d_currFrame, K, VO.getPose(), iteration_times);
-    historyPoses.push_back(VO.getPose());
-    std::cout << "After optimizations: " << new_pose.matrix() << std::endl;
+    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA(p3d_prevFrame,p2d_currFrame, K, VO.getPose(), 50);
+    historyPoses.push_back(new_pose);
+    std::cout << "After optimizations:\n" << new_pose.matrix() << std::endl;
 }
 
 void VisualSLAM::runBackEndRoutine(){

@@ -86,23 +86,34 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
 }
 
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
-    int max_features = 600;
+    int max_features = 1000;
 	// Detect ORB features and compute descriptors.
     cv::Ptr<cv::Feature2D> orb = cv::ORB::create(max_features);
     orb->detectAndCompute(frame_new, cv::Mat(), keypoints_new, descriptors_new);
 }
 
 std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new){
-    float good_match_ratio = 0.5;
+    const float good_match_ratio = 0.8;
+
+    std::vector<std::vector<cv::DMatch>> vmatches;
     std::vector<cv::DMatch> matches;
-    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce");
-    matcher->match(refFrame.descriptor, descriptors_new, matches, cv::Mat());
-	// Sort matches by score
-	std::sort(matches.begin(), matches.end());
-	// Remove not so good matches
-	const int numGoodMatches = matches.size() * good_match_ratio;
-	matches.erase(matches.begin()+numGoodMatches, matches.end());
-	return matches;
+
+    cv::Ptr<cv::DescriptorMatcher>  matcher = cv::DescriptorMatcher::create("BruteForce-Hamming(2)");
+    matcher->knnMatch(refFrame.descriptor, descriptors_new, vmatches, 1);
+    for (int i = 0; i < static_cast<int>(vmatches.size()); ++i) {
+        if (!vmatches[i].size()) {
+            continue;
+        }
+        matches.push_back(vmatches[i][0]);
+    }
+    // Sort matches by score
+    std::sort(matches.begin(), matches.end());
+
+    // Remove not so good matches
+    const int numGoodMatches = matches.size() * good_match_ratio;
+    matches.erase(matches.begin()+numGoodMatches, matches.end());
+
+    return matches;
 }
 
 void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d, Eigen::Matrix3d K){
