@@ -1,32 +1,4 @@
 #include "VisualSLAM.h"
-#include <opencv2/viz.hpp>
-
-void visualization_pose(std::vector<Sophus::SE3d> POSE ){
-    cv::viz::Viz3d vis("Visual Odometry");
-    cv::viz::WCoordinateSystem world_coor(1.0), camera_coor(0.5);
-    cv::Point3d cam_pos( 0, -1.0, -1.0 ), cam_focal_point(0,0,0), cam_y_dir(0,1,0);
-    cv::Affine3d cam_pose = cv::viz::makeCameraPose( cam_pos, cam_focal_point, cam_y_dir );
-    vis.setViewerPose( cam_pose );
-
-    world_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 2.0);
-    camera_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 1.0);
-    vis.showWidget( "World", world_coor );
-    vis.showWidget( "Camera", camera_coor );
-    for ( int i=0; i<POSE.size(); i++ )
-    {
-        Sophus::SE3d Tcw = POSE[i].inverse();
-
-        // show the map and the camera pose
-        cv::Mat R, t;
-        cv::eigen2cv(Tcw.so3().matrix(), R);
-        cv::eigen2cv(Tcw.translation(), t);
-       cv::Affine3d M(R,t);
-
-        vis.setWidgetPose( "Camera", M);
-        vis.spinOnce(300, false);      // time of each picture  it is better more than 300
-      }
-
-}
 
 int main(int argc, char** argv){
 
@@ -74,14 +46,5 @@ int main(int argc, char** argv){
     }
 
     slam.visualizeAllPoses();
-
-    /*
-    std::vector<Sophus::SE3d> poses;
-    for (int i = 0; i < slam.getNumberPoses(); i++){
-        poses.push_back(slam.getPose(i));
-    }
-
-    visualization_pose(poses);
-    */
     return 0;
 }

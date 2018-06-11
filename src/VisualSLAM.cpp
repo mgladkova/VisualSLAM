@@ -65,10 +65,12 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
 
 	// Draw top matches
 
+    /*
     cv::Mat imMatches;
     cv::drawMatches(refFrame.image, refFrame.keypoints, image_left, keypoints_new, matches, imMatches);
     cv::imshow("Matches", imMatches);
     cv::waitKey(0);
+    */
 
     std::vector<cv::Point3d> p3d_prevFrame;
     std::vector<cv::Point2d> p2d_currFrame;
