@@ -10,8 +10,6 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA(std::vector<cv::Point3d> p3d,st
     double cost = 0, lastCost = 0;
     int nPoints = p3d.size();
 
-    double scale = 100.0;
-
     double fx = K(0,0);
     double fy = K(1,1);
 
@@ -24,26 +22,17 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA(std::vector<cv::Point3d> p3d,st
         // compute cost
         for (int i = 0; i < nPoints; i++) {
             // compute cost for p3d[I] and p2d[I]
-            Eigen::Vector2d e(0,0);    // error
-            Eigen::Vector3d pointReprojected;
-            Eigen::Matrix3d R = T_esti.so3().matrix();
-            Eigen::Vector3d t = T_esti.translation();
-
             Eigen::Vector3d point3DEigen(p3d[i].x, p3d[i].y, p3d[i].z);
-
-            point3DEigen /= scale;
 
             Eigen::Vector2d point2DEigen(p2d[i].x, p2d[i].y);
 
-            Eigen::Vector3d pointTransformed =R*point3DEigen + t;
+            Eigen::Vector3d pointTransformed = T_esti*point3DEigen;
 
-            pointReprojected = K * pointTransformed;
+            Eigen::Vector3d pointReprojected = K * pointTransformed;
             pointReprojected /= pointTransformed[2];
 
-            //std::cout << point2DEigen[0] << " " << point2DEigen[1] << std::endl;
-            //std::cout << pointReprojected[0] << " " << pointReprojected[1] << std::endl;
-
-            e[0]=point3DEigen[0] - pointReprojected[0];
+            Eigen::Vector2d e(0,0);    // error
+            e[0]=point2DEigen[0] - pointReprojected[0];
             e[1]=point2DEigen[1] - pointReprojected[1];
 
             // compute jacobian

@@ -1,4 +1,5 @@
 #include <Eigen/Core>
+#include <vector>
 
 /**
  * Class Map is responsible for storing the 3D structure

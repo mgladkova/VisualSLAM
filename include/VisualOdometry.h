@@ -39,11 +39,11 @@ class VisualOdometry {
         cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);
 
         void extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new);
-        std::vector<cv::Point3f> estimate3DPoints(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map);
         std::vector<cv::DMatch> findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new);
 
-        void get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d, Eigen::Matrix3d K);
-        void get2d2dCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2);
+        void get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d,
+                                    cv::Mat disparity_map, Eigen::Matrix3d K);
+        void get2D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2);
 
         void estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<cv::Point2d> p2d, Eigen::Matrix3d K);
         void estimatePose2D2D(std::vector<cv::Point2d> p2d_1, std::vector<cv::Point2d> p2d_2, Eigen::Matrix3d K);

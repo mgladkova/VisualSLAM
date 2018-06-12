@@ -86,7 +86,7 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
 }
 
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
-    int max_features = 1000;
+    int max_features = 500;
 	// Detect ORB features and compute descriptors.
     cv::Ptr<cv::Feature2D> orb = cv::ORB::create(max_features);
     orb->detectAndCompute(frame_new, cv::Mat(), keypoints_new, descriptors_new);
@@ -94,21 +94,13 @@ void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPo
 
 std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new){
     const float good_match_ratio = 0.8;
-
-    std::vector<std::vector<cv::DMatch>> vmatches;
     std::vector<cv::DMatch> matches;
 
     cv::Ptr<cv::DescriptorMatcher>  matcher = cv::DescriptorMatcher::create("BruteForce-Hamming(2)");
-    matcher->knnMatch(refFrame.descriptor, descriptors_new, vmatches, 1);
-    for (int i = 0; i < static_cast<int>(vmatches.size()); ++i) {
-        if (!vmatches[i].size()) {
-            continue;
-        }
-        matches.push_back(vmatches[i][0]);
-    }
+    matcher->match(refFrame.descriptor, descriptors_new, matches);
+
     // Sort matches by score
     std::sort(matches.begin(), matches.end());
-
     // Remove not so good matches
     const int numGoodMatches = matches.size() * good_match_ratio;
     matches.erase(matches.begin()+numGoodMatches, matches.end());
@@ -116,12 +108,14 @@ std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv
     return matches;
 }
 
-void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d, Eigen::Matrix3d K){
+void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches,
+                                            std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d,
+                                            cv::Mat disparity_map, Eigen::Matrix3d K){
     if (matches.empty()){
         throw std::runtime_error("get3d2dCorrespondences() : Input vector with keypoint matching is empty");
     }
 
-    double b = 0.573;
+    double b = 0.53716;
     double fx = K(0,0);
     double fy = K(1,1);
     double cx = K(0,2);
@@ -132,15 +126,15 @@ void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_
     for (auto &m: matches) {
         cv::Point2d p1 = refFrame.keypoints[m.queryIdx].pt;
         cv::Point2d p2 = keypoints_new[m.trainIdx].pt;
-        float disparity = refFrame.disparity_map.at<float>(p1.y, p1.x);
+        float disparity = disparity_map.at<float>(p2.y, p2.x);
         if (disparity){
            double z = f*b/disparity;
-           double x = z*(p1.x - cx) / fx;
-           double y = z*(p1.y - cy) / fy;
+           double x = z*(p2.x - cx) / fx;
+           double y = z*(p2.y - cy) / fy;
            //std::cout << x << " " << y << " " << z << std::endl;
-           cv::Point3d p1_3d(x, y, z);
-           p3d.push_back(p1_3d);
-           p2d.push_back(p2);
+           cv::Point3d p2_3d(x, y, z);
+           p3d.push_back(p2_3d);
+           p2d.push_back(p1);
         }
     }
 
@@ -148,7 +142,7 @@ void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_
 
 }
 
-void VisualOdometry::get2d2dCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2){
+void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2){
     if (matches.empty()){
         throw std::runtime_error("get2d2dCorrespondences() : Input vector with keypoint matching is empty");
     }
@@ -169,8 +163,10 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
     Eigen::Vector3d t(0,0,0);
 
+    std::vector<int> inliers;
+
     cv::eigen2cv(K, cameraMatrix);
-    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
+    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 5.0, 0.99, inliers);
 
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
