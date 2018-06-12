@@ -9,12 +9,11 @@
 ### modify config/defualt.yaml; add path to kitti dataset and add cameta camera intrinsics
 
 #3 run the code
-#cd project/0.3
-#mkdir build
-#cd build
-#cmake ..
-#make
-
-#cd ..
-#bin/run_vo config/default.yaml
+###cd project/0.3
+###mkdir build
+###cd build
+###cmake ..
+###make
+###cd ..
+###bin/run_vo config/default.yaml
 
