@@ -9,12 +9,12 @@ Visual-based Navigation project
 ## How to build and run the code:
 1. Download and install VTK for opencv Viz module: https://www.vtk.org/download/
 2. If you have already installed OpenCV, you need to reinstall it such that OpenCV can find freshly-installed VTK library (credits to https://stackoverflow.com/questions/23559925/how-do-i-use-install-viz-in-opencv?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa)
-3.
+3. Note: [..] means an optional command-line argument
 ```bash
 mkdir build
 cmake ..
 make
-./slam ../data/left ../data/right 10
+./slam ../data/left ../data/right 10 [../data/groundTruth.txt]
 
 ## only 22 for visualization otherwise we can only see pose data
 ./slam ../data/left/ ../data/right/ ../data/calib.txt 22
