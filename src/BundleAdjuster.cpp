@@ -60,7 +60,7 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA(std::vector<cv::Point3d> p3d,st
             H += J.transpose() * J;
             b += -J.transpose() * e;
 
-            cost += 0.5 *(e[0]*e[0] + e[1]*e[1]);
+            cost += 0.5 * e.norm();
             // cout<<"cost on line is : "<<cost<<endl;
         }
 

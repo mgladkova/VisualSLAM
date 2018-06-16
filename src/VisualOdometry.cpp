@@ -163,10 +163,9 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
     Eigen::Vector3d t(0,0,0);
 
-    std::vector<int> inliers;
-
     cv::eigen2cv(K, cameraMatrix);
-    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 5.0, 0.99, inliers);
+
+    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
 
     if (result){
         cv::Rodrigues(rvec, rot_matrix);

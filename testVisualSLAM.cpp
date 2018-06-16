@@ -3,7 +3,7 @@
 int main(int argc, char** argv){
 
 	if (argc < 5){
-		std::cout << "Usage: ./slam <input_left_image_directory> <input_right_image_directory> <camera_intrinsics_file_path> <num_images>" << std::endl;
+        std::cout << "Usage: ./slam <input_left_image_directory> <input_right_image_directory> <camera_intrinsics_file_path> <num_images> [ground_truth_data_path]" << std::endl;
 		exit(1);
 	}
 
@@ -21,6 +21,17 @@ int main(int argc, char** argv){
 	VisualSLAM slam;
     int k = 1;
 	slam.readCameraIntrisics(camera_intrinsics_path);
+
+    Eigen::Vector3d translGTAccumulated, translEstimAccumulated;
+    bool gtDataLoaded = false;
+
+    if (argc >= 6){
+        std::string ground_truth_path = argv[5];
+        slam.readGroundTruthData(ground_truth_path, num_images);
+        gtDataLoaded = true;
+    }
+
+    cv::Mat window = cv::Mat::zeros(500, 500, CV_8UC3);
     for (int i = 0; i < num_images; i++){
         if (i == std::pow(10, k)){
             image_name_template = image_name_template.substr(0, image_name_template.length() - 1);
@@ -43,8 +54,15 @@ int main(int argc, char** argv){
         //cv::imshow("Image_right", image_right);
         //cv::waitKey(0);
         slam.performFrontEndStep(image_left, image_right);
+        if (gtDataLoaded){
+            slam.plotTrajectoryNextStep(window, translGTAccumulated,translEstimAccumulated);
+            if (i > 0 && i % 10 == 0){
+                cv::imshow("GT vs Estimated position", window);
+                cv::waitKey(3);
+            }
+        }
     }
 
-    slam.visualizeAllPoses();
+    //slam.visualizeAllPoses();
     return 0;
 }
