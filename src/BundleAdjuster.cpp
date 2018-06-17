@@ -5,7 +5,7 @@ typedef Eigen::Matrix<double, 6, 6> Matrix66d;
 
 BundleAdjuster::BundleAdjuster() {}
 
-Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d, Eigen::Matrix3d K,Sophus::SE3d pose,int numberIterations)
+Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d, Eigen::Matrix3d K,Sophus::SE3d pose)
 {
         assert(p3d.size() == p2d.size());
 
@@ -17,22 +17,17 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> 
 
         //local BA
         ceres::Problem problem;
-        ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization();
+        //ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization();
         //double array for ceres
         int numPoints3D = p3d.size();
         double translation[3] = {t[0], t[1], t[2]};
         double points3D[numPoints3D][3];
 
-        double camera[8];
+        double camera[4];
         camera[0] = q_rotation.w();
         camera[1] = q_rotation.x();
         camera[2] = q_rotation.y();
         camera[3] = q_rotation.z();
-
-        camera[4] = K(0,0);
-        camera[5] = K(1,1);
-        camera[6] = K(0,2);
-        camera[7] = K(1,2);
 
         // not required, keeping it for reference
         // double cameraRotation[4] = {q_rotation.w(), q_rotation.x(), q_rotation.y(), q_rotation.z()};
@@ -64,6 +59,8 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> 
         //std::cout << "Final   m: " << m << " c: " << c << "\n";
 
         Eigen::Quaterniond quaterniond_(camera[0], camera[1], camera[2], camera[3]);
+
+        std::cout << camera[4] << " " << camera[5] << " " << camera[6] << std::endl;
         Eigen::Vector3d translation_(translation[0],translation[1],translation[2]);
         Sophus::SE3d cameraTransform(quaterniond_,translation_);
         //std::cout << SE3_quaternion.matrix() << std::endl;

@@ -103,22 +103,21 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
 
     std::vector<cv::Point3d> p3d_prevFrame;
     std::vector<cv::Point2d> p2d_currFrame;
+
     VO.get3D2DCorrespondences(keypoints_new, matches, p3d_prevFrame, p2d_currFrame, disparity_map, K);
 
     std::vector<int> inlier_index = VO.estimatePose3D2D(p3d_prevFrame, p2d_currFrame, K);
     VO.setReferenceFrame(image_left, disparity_map, keypoints_new, descriptors_new);
 
-
     // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
     std::vector<cv::Point3d> p3d_prevFrame_inlier;
     std::vector<cv::Point2d> p2d_currFrame_inlier;
-    for(int i=0;i<inlier_index.size();i++)
-    {
-        int index=inlier_index[i];
+    for(auto& index : inlier_index){
         p3d_prevFrame_inlier.push_back(p3d_prevFrame[index]);
         p2d_currFrame_inlier.push_back(p2d_currFrame[index]);
     }
-    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA_ceres(p3d_prevFrame_inlier,p2d_currFrame_inlier, K, VO.getPose(), 50);
+
+    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA_ceres(p3d_prevFrame_inlier,p2d_currFrame_inlier, K, VO.getPose());
     historyPoses.push_back(new_pose);
     std::cout << "After optimizations:\n" << new_pose.matrix() << std::endl;
 }
@@ -131,7 +130,7 @@ void VisualSLAM::update(){
 	//TODO
 }
 
-void VisualSLAM::plotTrajectoryNextStep(cv::Mat& window, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated){
+void VisualSLAM::plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated){
     if (groundTruthData.empty() || historyPoses.empty()){
         return;
     }
@@ -140,20 +139,20 @@ void VisualSLAM::plotTrajectoryNextStep(cv::Mat& window, Eigen::Vector3d& transl
     int offsetX = 120;
     int offsetY = 120;
 
-    float scale = 1;
+    float scale = 0.1;
 
-    if (historyPoses.size() == 1){
+    if (index == 1){
         translEstimAccumulated = scale*historyPoses[0].translation();
         translGTAccumulated = groundTruthData[0].translation();
         cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
         cv::circle(window, cv::Point2d(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
-    } else {
-        int i = historyPoses.size() - 1;
-        Eigen::Matrix3d rotationFrameToFrame = groundTruthData[i].so3().matrix()*groundTruthData[i - 1].so3().inverse().matrix();
-        translGTAccumulated = translGTAccumulated + rotationFrameToFrame*(groundTruthData[i].translation() - groundTruthData[i-1].translation());
+    } else if (index < groundTruthData.size() && index > 1){
+        std::cout << index << " / " << historyPoses.size() << std::endl;
+        Eigen::Matrix3d rotationFrameToFrame = groundTruthData[index].so3().matrix()*groundTruthData[index - 1].so3().inverse().matrix();
+        translGTAccumulated = translGTAccumulated + rotationFrameToFrame*(groundTruthData[index].translation() - groundTruthData[index-1].translation());
         cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
 
-        translEstimAccumulated = translEstimAccumulated + scale*historyPoses[i-1].so3().matrix()*historyPoses[i].translation();
+        translEstimAccumulated = translEstimAccumulated + scale*historyPoses[index-1].so3().matrix()*historyPoses[index].translation();
         cv::circle(window, cv::Point2d(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
     }
 }
@@ -212,8 +211,7 @@ void VisualSLAM::visualizeAllPoses(){
     double cx = K(0,2);
     double cy = K(1,2);
 
-    while (pangolin::ShouldQuit() == false)
-    {
+    while (pangolin::ShouldQuit() == false){
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         d_cam.Activate(s_cam);
@@ -222,8 +220,7 @@ void VisualSLAM::visualizeAllPoses(){
         // draw poses
         float sz = 0.1;
         int width = 640, height = 480;
-        for (auto &Tcw: historyPoses)
-        {
+        for (auto &Tcw: historyPoses){
             glPushMatrix();
             Sophus::Matrix4f m = Tcw.inverse().matrix().cast<float>();
             glMultMatrixf((GLfloat *) m.data());

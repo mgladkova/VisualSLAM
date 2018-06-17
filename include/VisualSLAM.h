@@ -29,5 +29,5 @@ public:
 	void update(); // update map and poses
     void visualizeAllPoses();
     void visualizeTrajectoryVSGroundTruthTransformation();
-    void plotTrajectoryNextStep(cv::Mat& window, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated);
+    void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated);
 };

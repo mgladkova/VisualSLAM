@@ -11,7 +11,7 @@ int main(int argc, char** argv){
 	std::string input_right_images_path = argv[2];
 	std::string camera_intrinsics_path = argv[3];
 	int num_images = std::stoi(argv[4]);
-	std::string image_name_template = "00000";
+    std::string image_name_template = "00000";
 
     if (num_images <= 0)
     {
@@ -32,6 +32,8 @@ int main(int argc, char** argv){
 
     cv::Mat window = cv::Mat::zeros(500, 500, CV_8UC3);
     for (int i = 0; i < num_images; i++){
+
+        std::cout << "FRAME " << i << std::endl;
         if (i == std::pow(10, k)){
             image_name_template = image_name_template.substr(0, image_name_template.length() - 1);
             k++;
@@ -54,8 +56,8 @@ int main(int argc, char** argv){
         //cv::waitKey(0);
         slam.performFrontEndStep(image_left, image_right);
         if (gtDataLoaded){
-            slam.plotTrajectoryNextStep(window, translGTAccumulated,translEstimAccumulated);
-            if (i > 0 && i % 10 == 0){
+            if (i > 1){
+                slam.plotTrajectoryNextStep(window, i - 1, translGTAccumulated,translEstimAccumulated);
                 cv::imshow("GT vs Estimated position", window);
                 cv::waitKey(3);
             }

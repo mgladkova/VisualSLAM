@@ -36,16 +36,15 @@ struct ReprojectionError3D
         {
                 T p[3];
                 /***** code from hk technology */
-                T camera_R[4] = {camera[0], camera[1], camera[2], camera[3]};
-                ceres::QuaternionRotatePoint(camera_R, point, p);
+                ceres::QuaternionRotatePoint(camera, point, p);
                 p[0] += camera_T[0];
                 p[1] += camera_T[1];
                 p[2] += camera_T[2];
 
-                T fx = camera[4];
-                T fy = camera[5];
-                T cx = camera[6];
-                T cy = camera[7];
+                T fx = T(718.856);
+                T fy = T(718.856);
+                T cx = T(607.1928);
+                T cy = T(185.2157);
 
                 T xp = p[0]*fx*1./ p[2] +cx;
                 T yp = p[1]*fy*1./ p[2] +cy;
@@ -59,7 +58,7 @@ struct ReprojectionError3D
                                            const double observed_y)
         {
           return (new ceres::AutoDiffCostFunction<
-                  ReprojectionError3D, 2, 8, 3, 3>(
+                  ReprojectionError3D, 2, 4, 3, 3>(
                         new ReprojectionError3D(observed_x,observed_y)));
         }
 
@@ -70,5 +69,5 @@ struct ReprojectionError3D
 class BundleAdjuster {
 public:
         BundleAdjuster();
-        Sophus::SE3d optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3d pose,int iteration_times);
+        Sophus::SE3d optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d,Eigen::Matrix3d K,Sophus::SE3d pose);
 };

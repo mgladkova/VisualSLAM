@@ -29,7 +29,7 @@ class VisualOdometry {
 
 	public:
 		VisualOdometry();
-        void setReferenceFrame(const cv::Mat image, const cv::Mat disparity, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptor);
+        void setReferenceFrame(const cv::Mat image, const cv::Mat disparity_map, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptor);
         KeyFrame getReferenceFrame() const;
 
         void setPose(const Sophus::SE3d pose);
