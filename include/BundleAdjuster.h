@@ -1,4 +1,4 @@
-// * Class BundleAdjuster is responsible for 3D structure and camera pose optimizations
+// * Class BundleAdjuster is responsible for optimizations of 3D structure and camera pose
 
 
 #include <Eigen/Core>
@@ -32,19 +32,21 @@ struct ReprojectionError3D
                 {}
 
         template <typename T>
-        bool operator()(const T* const camera_R, const T* const camera_T, const T* point, T* residuals) const
+        bool operator()(const T* const camera, const T* const camera_T, const T* point, T* residuals) const
         {
                 T p[3];
                 /***** code from hk technology */
+                T camera_R[4] = {camera[0], camera[1], camera[2], camera[3]};
                 ceres::QuaternionRotatePoint(camera_R, point, p);
                 p[0] += camera_T[0];
                 p[1] += camera_T[1];
                 p[2] += camera_T[2];
 
-                double fx=718.856;
-                double fy=718.856;
-                double cx=607.193;
-                double cy=185.216;
+                T fx = camera[4];
+                T fy = camera[5];
+                T cx = camera[6];
+                T cy = camera[7];
+
                 T xp = p[0]*fx*1./ p[2] +cx;
                 T yp = p[1]*fy*1./ p[2] +cy;
 
@@ -57,7 +59,7 @@ struct ReprojectionError3D
                                            const double observed_y)
         {
           return (new ceres::AutoDiffCostFunction<
-                  ReprojectionError3D, 2, 4, 3, 3>(
+                  ReprojectionError3D, 2, 8, 3, 3>(
                         new ReprojectionError3D(observed_x,observed_y)));
         }
 
