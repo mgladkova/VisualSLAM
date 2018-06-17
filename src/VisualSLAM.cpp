@@ -105,12 +105,20 @@ void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
     std::vector<cv::Point2d> p2d_currFrame;
     VO.get3D2DCorrespondences(keypoints_new, matches, p3d_prevFrame, p2d_currFrame, disparity_map, K);
 
-    VO.estimatePose3D2D(p3d_prevFrame, p2d_currFrame, K);
+    std::vector<int> inlier_index = VO.estimatePose3D2D(p3d_prevFrame, p2d_currFrame, K);
     VO.setReferenceFrame(image_left, disparity_map, keypoints_new, descriptors_new);
 
 
     // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
-    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA(p3d_prevFrame,p2d_currFrame, K, VO.getPose(), 50);
+    std::vector<cv::Point3d> p3d_prevFrame_inlier;
+    std::vector<cv::Point2d> p2d_currFrame_inlier;
+    for(int i=0;i<inlier_index.size();i++)
+    {
+        int index=inlier_index[i];
+        p3d_prevFrame_inlier.push_back(p3d_prevFrame[index]);
+        p2d_currFrame_inlier.push_back(p2d_currFrame[index]);
+    }
+    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA_ceres(p3d_prevFrame_inlier,p2d_currFrame_inlier, K, VO.getPose(), 50);
     historyPoses.push_back(new_pose);
     std::cout << "After optimizations:\n" << new_pose.matrix() << std::endl;
 }

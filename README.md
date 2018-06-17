@@ -18,6 +18,3 @@ make
 
 ## only 22 for visualization otherwise we can only see pose data
 ./slam ../data/left/ ../data/right/ ../data/calib.txt 22
-```
-
-

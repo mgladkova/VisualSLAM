@@ -21,7 +21,6 @@ int main(int argc, char** argv){
 	VisualSLAM slam;
     int k = 1;
 	slam.readCameraIntrisics(camera_intrinsics_path);
-
     Eigen::Vector3d translGTAccumulated, translEstimAccumulated;
     bool gtDataLoaded = false;
 

@@ -8,6 +8,7 @@
 class VisualSLAM {
 private:
 	Map map;
+//	Map map;
     BundleAdjuster BA;
     VisualOdometry VO;
     Eigen::Matrix3d K;

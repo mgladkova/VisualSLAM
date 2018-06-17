@@ -156,17 +156,16 @@ void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_
     }
 }
 
-void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<cv::Point2d> p2d, Eigen::Matrix3d K){
+std::vector<int> VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<cv::Point2d> p2d, Eigen::Matrix3d K){
     cv::Mat cameraMatrix;
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
-    cv::Mat rvec,tvec,rot_matrix;
+    cv::Mat rvec,tvec,rot_matrix,inliers;
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
     Eigen::Vector3d t(0,0,0);
-
     cv::eigen2cv(K, cameraMatrix);
+    std::cout<<"p3d.size()"<<p3d.size()<<std::endl;
 
-    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec);
-
+    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 5.0, 0.99, inliers);
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
         cv::cv2eigen(rot_matrix, R);
@@ -175,6 +174,13 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<
 
     pose = Sophus::SE3d(R, t);
     std::cout << "3D-2D Pnp solved Pose: "<<std::endl<< pose.matrix() << std::endl;
+
+    /* optimization p3d[inliers_index] and p2d[inliers_index] and pose */
+    std::vector<int> inliers_index;
+    for ( int i=0; i<inliers.rows; i++){
+          inliers_index.push_back(inliers.at<int>(i,0));
+    }
+    return inliers_index;
 }
 
 void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2d> p2d_1, std::vector<cv::Point2d> p2d_2, Eigen::Matrix3d K){
