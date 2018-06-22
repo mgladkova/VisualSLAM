@@ -19,21 +19,25 @@ int main(int argc, char** argv){
 	}
 
 	VisualSLAM slam;
-    int k = 1;
 	slam.readCameraIntrisics(camera_intrinsics_path);
-    Eigen::Vector3d translGTAccumulated, translEstimAccumulated;
-    bool gtDataLoaded = false;
+    Eigen::Vector3d translGTAccumulated, translEstimAccumulated(1,1,1);
+    std::vector<Sophus::SE3d> groundTruthPoses;
 
     if (argc >= 6){
         std::string ground_truth_path = argv[5];
-        slam.readGroundTruthData(ground_truth_path, num_images);
-        gtDataLoaded = true;
+        slam.readGroundTruthData(ground_truth_path, num_images, groundTruthPoses);
     }
 
-    cv::Mat window = cv::Mat::zeros(500, 500, CV_8UC3);
+    cv::Mat window = cv::Mat::zeros(1000, 1000, CV_8UC3);
+    cv::Mat prevImageLeft;
+    std::vector<cv::Point2f> pointsCurrentFrame, pointsPrevFrame;
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+    Eigen::Matrix3d cumR = Eigen::Matrix3d::Identity();
+
+    int k = 1;
     for (int i = 0; i < num_images; i++){
 
-        std::cout << "FRAME " << i << std::endl;
         if (i == std::pow(10, k)){
             image_name_template = image_name_template.substr(0, image_name_template.length() - 1);
             k++;
@@ -41,8 +45,10 @@ int main(int argc, char** argv){
 
         std::string image_left_name = input_left_images_path + image_name_template + std::to_string(i) + ".png";
 		std::string image_right_name = input_right_images_path + image_name_template + std::to_string(i) + ".png";
-        cv::Mat image_left = cv::imread(image_left_name, 0);
+        cv::Mat image_left = cv::imread(image_left_name, 0), image_left_BGR;
         cv::Mat image_right = cv::imread(image_right_name, 0);
+
+        cv::cvtColor(image_left, image_left_BGR, CV_GRAY2BGR);
 
 		if (image_left.cols == 0 || image_left.rows == 0){
 			throw std::runtime_error("Cannot read the image with the path: " + image_left_name);
@@ -51,19 +57,23 @@ int main(int argc, char** argv){
 		if (image_right.cols == 0 || image_right.rows == 0){
 			throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
 		}
-        //cv::imshow("Image_left", image_left);
-        //cv::imshow("Image_right", image_right);
-        //cv::waitKey(0);
-        slam.performFrontEndStep(image_left, image_right);
-        if (gtDataLoaded){
-            if (i > 1){
-                slam.plotTrajectoryNextStep(window, i - 1, translGTAccumulated,translEstimAccumulated);
-                cv::imshow("GT vs Estimated position", window);
-                cv::waitKey(3);
+        //Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
+        Sophus::SE3d pose = slam.performFrontEndStep(image_left, image_right, keypoints, descriptors);
+        std::cout << pose.matrix() << std::endl;
+        plot2DPoints(image_left, keypoints);
+        if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
+            if (i == 0){
+                Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
+                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, pose, cumR);
+            } else {
+                std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
+                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], pose, cumR);
             }
         }
     }
 
-    //slam.visualizeAllPoses();
+    cv::imwrite("result_trajectories.png", window);
+
+    //visualizeAllPoses();
     return 0;
 }

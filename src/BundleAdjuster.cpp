@@ -5,7 +5,7 @@ typedef Eigen::Matrix<double, 6, 6> Matrix66d;
 
 BundleAdjuster::BundleAdjuster() {}
 
-Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d, Eigen::Matrix3d K,Sophus::SE3d pose)
+Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3f> p3d,std::vector<cv::Point2f> p2d, Eigen::Matrix3d K,Sophus::SE3d pose)
 {
         assert(p3d.size() == p2d.size());
 
@@ -54,7 +54,7 @@ Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> 
         // options.max_solver_time_in_seconds = 0.2;
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
-        //std::cout << summary.BriefReport() << "\n";
+        std::cout << summary.BriefReport() << "\n";
         //std::cout << "Final rotation: " << rotation << " Final translation: " << translation << "\n";
         //std::cout << "Final   m: " << m << " c: " << c << "\n";
 

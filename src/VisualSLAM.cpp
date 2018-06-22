@@ -48,16 +48,18 @@ void VisualSLAM::readCameraIntrisics(std::string camera_file_path){
 
 }
 
-void VisualSLAM::readGroundTruthData(std::string fileName, int numberFrames){
+void VisualSLAM::readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData){
     std::ifstream inFile;
-    groundTruthData.clear();
-    groundTruthData.reserve(numberFrames);
-
     inFile.open(fileName, std::ifstream::in);
 
     if (!inFile){
-        throw std::runtime_error("Cannot read the file with ground truth data");
+        throw std::runtime_error("readGroundTruthData() : Cannot read the file with ground truth data");
     }
+    if (numberFrames <= 0){
+        throw std::runtime_error("readGroundTruthData() : Number of frames is non-positive!");
+    }
+
+    groundTruthData.clear();
 
     int i = 0;
     while(i < numberFrames && !inFile.eof()){
@@ -73,181 +75,83 @@ void VisualSLAM::readGroundTruthData(std::string fileName, int numberFrames){
         cv::Mat R_CV = cv::Mat(3,3, CV_64F, rotationElements);
         Eigen::Matrix3d R_Eigen;
         cv::cv2eigen(R_CV, R_Eigen);
-        groundTruthData.push_back(Sophus::SE3d(Eigen::Quaterniond(R_Eigen), Eigen::Vector3d(translationElements)));
+        Sophus::SE3d newPose = Sophus::SE3d(Eigen::Quaterniond(R_Eigen), Eigen::Vector3d(translationElements));
+        groundTruthData.push_back(newPose);
         i++;
     }
 }
 
-void VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right){
-    std::vector<cv::KeyPoint> keypoints_new;
-	cv::Mat descriptors_new;
+Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame){
+    cv::Mat descriptorsCurrentFrame;
+    std::vector<cv::KeyPoint> keyPointsCurrentFrame;
 
-    VO.extractORBFeatures(image_left, keypoints_new, descriptors_new);
-    KeyFrame refFrame = VO.getReferenceFrame();
+    VO.extractORBFeatures(image_left, keyPointsCurrentFrame, descriptorsCurrentFrame);
+    cv::Mat disparityCurrentFrame = VO.getDisparityMap(image_left, image_right);
+
+    Sophus::SE3d pose;
+    if (keyPointsPrevFrame.empty()){
+      keyPointsPrevFrame = keyPointsCurrentFrame;
+      descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
+
+      return pose;
+    }
+
+    std::vector<cv::DMatch> matches = VO.findGoodORBFeatureMatches(keyPointsPrevFrame, keyPointsCurrentFrame, descriptorsPrevFrame, descriptorsCurrentFrame);
+
+    std::vector<cv::Point2f> p2d_prevFrame, p2d_currFrame;
+
+    VO.get2D2DCorrespondences(keyPointsPrevFrame, keyPointsCurrentFrame, matches, p2d_prevFrame, p2d_currFrame);
+
+    std::vector<cv::Point3f> p3d_currFrame = VO.get3DCoordinates(p2d_currFrame, disparityCurrentFrame, K);
+
+    VO.estimatePose3D2D(p3d_currFrame, p2d_prevFrame, K, pose);
+
+    descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
+
+    keyPointsPrevFrame.clear();
+    keyPointsPrevFrame = keyPointsCurrentFrame;
+
+    return pose;
+}
+
+Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat image_right, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImageLeft){
+    int max_features = 500;
+    cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
+    cv::Size subPixWinSize(10,10);
+
     cv::Mat disparity_map = VO.getDisparityMap(image_left, image_right);
+    Sophus::SE3d pose;
 
-    if (refFrame.keypoints.empty()){
-        VO.setReferenceFrame(image_left, disparity_map, keypoints_new, descriptors_new);
-		return;
-	}
+    if (pointsPreviousFrame.empty()){
+        std::cout << "INIT" << std::endl;
+        cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
+        cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
+        pointsPreviousFrame.clear();
+        pointsPreviousFrame = pointsCurrentFrame;
 
-	std::vector<cv::DMatch> matches = VO.findGoodORBFeatureMatches(keypoints_new, descriptors_new);
-
-	// Draw top matches
-    /*
-    cv::Mat imMatches;
-    cv::drawMatches(refFrame.image, refFrame.keypoints, image_left, keypoints_new, matches, imMatches);
-    cv::imshow("Matches", imMatches);
-    cv::waitKey(0);
-    */
-
-    std::vector<cv::Point3d> p3d_prevFrame;
-    std::vector<cv::Point2d> p2d_currFrame;
-
-    VO.get3D2DCorrespondences(keypoints_new, matches, p3d_prevFrame, p2d_currFrame, disparity_map, K);
-
-    std::vector<int> inlier_index = VO.estimatePose3D2D(p3d_prevFrame, p2d_currFrame, K);
-    VO.setReferenceFrame(image_left, disparity_map, keypoints_new, descriptors_new);
-
-    // each motion bundle adjustment (reference image's 3D point and matched image's 2D point)
-    std::vector<cv::Point3d> p3d_prevFrame_inlier;
-    std::vector<cv::Point2d> p2d_currFrame_inlier;
-    for(auto& index : inlier_index){
-        p3d_prevFrame_inlier.push_back(p3d_prevFrame[index]);
-        p2d_currFrame_inlier.push_back(p2d_currFrame[index]);
+        image_left.copyTo(prevImageLeft);
+        return pose;
     }
 
-    Sophus::SE3d new_pose = BA.optimizeLocalPoseBA_ceres(p3d_prevFrame_inlier,p2d_currFrame_inlier, K, VO.getPose());
-    historyPoses.push_back(new_pose);
-    std::cout << "After optimizations:\n" << new_pose.matrix() << std::endl;
-}
+    int thresholdNumberFeatures = 200;
+    bool init = false;
 
-void VisualSLAM::runBackEndRoutine(){
-	// TODO
-}
+    VO.trackFeatures(prevImageLeft, image_left, pointsPreviousFrame, pointsCurrentFrame, thresholdNumberFeatures, init);
 
-void VisualSLAM::update(){
-	//TODO
-}
+    std::vector<cv::Point3f> points3DCurrentFrame = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
 
-void VisualSLAM::plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated){
-    if (groundTruthData.empty() || historyPoses.empty()){
-        return;
+    //VO.estimatePose2D2D(pointsPreviousFrame, pointsCurrentFrame, K, pose);
+    VO.estimatePose3D2D(points3DCurrentFrame, pointsPreviousFrame, K, pose);
+
+    if (init){
+        pointsCurrentFrame.clear();
+        cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
+        cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
     }
 
-    assert(groundTruthData.size() >= historyPoses.size());
-    int offsetX = 120;
-    int offsetY = 120;
+    pointsPreviousFrame.clear();
+    pointsPreviousFrame = pointsCurrentFrame;
 
-    float scale = 0.1;
-
-    if (index == 1){
-        translEstimAccumulated = scale*historyPoses[0].translation();
-        translGTAccumulated = groundTruthData[0].translation();
-        cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-        cv::circle(window, cv::Point2d(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
-    } else if (index < groundTruthData.size() && index > 1){
-        std::cout << index << " / " << historyPoses.size() << std::endl;
-        Eigen::Matrix3d rotationFrameToFrame = groundTruthData[index].so3().matrix()*groundTruthData[index - 1].so3().inverse().matrix();
-        translGTAccumulated = translGTAccumulated + rotationFrameToFrame*(groundTruthData[index].translation() - groundTruthData[index-1].translation());
-        cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-
-        translEstimAccumulated = translEstimAccumulated + scale*historyPoses[index-1].so3().matrix()*historyPoses[index].translation();
-        cv::circle(window, cv::Point2d(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
-    }
-}
-
-void VisualSLAM::visualizeTrajectoryVSGroundTruthTransformation(){
-    cv::Mat window = cv::Mat::zeros(1000, 1000, CV_64FC3);
-
-    if (groundTruthData.empty()){
-        throw std::runtime_error("visualizeTrajectoryVSGroundTruthTransformation() : No GT data is stored!");
-    }
-
-    Eigen::Vector3d translGTAccumulated = groundTruthData[0].translation();
-    cv::circle(window, cv::Point2d(400 + translGTAccumulated[0], 400 + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-
-    for (int i = 1; i < groundTruthData.size(); i++){
-        Eigen::Matrix3d rotationFrameToFrame = groundTruthData[i].so3().matrix()*groundTruthData[i - 1].so3().inverse().matrix();
-        translGTAccumulated = translGTAccumulated + rotationFrameToFrame*(groundTruthData[i].translation() - groundTruthData[i-1].translation());
-        cv::circle(window, cv::Point2d(400 + translGTAccumulated[0], 400 + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-    }
-
-    if (historyPoses.empty()){
-        throw std::runtime_error("visualizeTrajectoryVSGroundTruthTransformation() : No poses are computed and stored!");
-    }
-
-    Eigen::Vector3d translEstimAccumulated = historyPoses[0].translation();
-    cv::circle(window, cv::Point2d(400 + translEstimAccumulated[0], 400 + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
-    float scale = 0.01;
-
-    for (int i = 1; i < historyPoses.size(); i++){
-        translEstimAccumulated = translEstimAccumulated + scale*historyPoses[i-1].so3().matrix()*historyPoses[i].translation();
-        cv::circle(window, cv::Point2d(400 + translEstimAccumulated[0], 400 + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
-    }
-
-    cv::imshow("Window", window);
-    cv::waitKey(0);
-}
-
-void VisualSLAM::visualizeAllPoses(){
-    // create pangolin window and plot the trajectory
-    pangolin::CreateWindowAndBind("VisualSLAM Viewer", 1024, 768);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    pangolin::OpenGlRenderState s_cam(
-                pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
-                pangolin::ModelViewLookAt(0, -0.1, -1.8, 0, 0, 0, 0.0, -1.0, 0.0)
-                );
-
-    pangolin::View &d_cam = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
-            .SetHandler(new pangolin::Handler3D(s_cam));
-
-    double fx = K(0,0);
-    double fy = K(1,1);
-    double cx = K(0,2);
-    double cy = K(1,2);
-
-    while (pangolin::ShouldQuit() == false){
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        d_cam.Activate(s_cam);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-        // draw poses
-        float sz = 0.1;
-        int width = 640, height = 480;
-        for (auto &Tcw: historyPoses){
-            glPushMatrix();
-            Sophus::Matrix4f m = Tcw.inverse().matrix().cast<float>();
-            glMultMatrixf((GLfloat *) m.data());
-            glColor3f(1, 0, 0);
-            glLineWidth(2);
-            glBegin(GL_LINES);
-            glVertex3f(0, 0, 0);
-            glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glVertex3f(0, 0, 0);
-            glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(0, 0, 0);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(0, 0, 0);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-            glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
-            glEnd();
-            glPopMatrix();
-        }
-
-        pangolin::FinishFrame();
-        usleep(5000);   // sleep 5 ms
-    }
+    image_left.copyTo(prevImageLeft);
+    return pose;
 }
