@@ -24,6 +24,10 @@ double VisualSLAM::getFocalLength() const {
     return (K(0,0) + K(1,1)) / 2.0;
 }
 
+std::vector<cv::Point3f> VisualSLAM::getStructure3D() const{
+    return map.getStructure3D();
+}
+
 void VisualSLAM::readCameraIntrisics(std::string camera_file_path){
 	std::ifstream file;
 	file.open(camera_file_path, std::ifstream::in);
@@ -121,32 +125,75 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
 
     cv::Mat disparity_map = VO.getDisparityMap(image_left, image_right);
     Sophus::SE3d pose;
-
+    // the first image is received
     if (pointsPreviousFrame.empty()){
-        std::cout << "INIT" << std::endl;
         cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
         cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
+
+        std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
+
+        std::vector<int> indices(pointsCurrentFrame.size());
+        std::iota(indices.begin(), indices.end(), 0);
+
+        map.addObservations(indices, pointsCurrentFrame, true);
+        map.updateCumulativePose(pose);
+        map.addPoints3D(points3D);
+
+        map.updateCameraIndex();
+
+        image_left.copyTo(prevImageLeft);
         pointsPreviousFrame.clear();
         pointsPreviousFrame = pointsCurrentFrame;
 
-        image_left.copyTo(prevImageLeft);
         return pose;
     }
 
     int thresholdNumberFeatures = 200;
     bool init = false;
 
-    VO.trackFeatures(prevImageLeft, image_left, pointsPreviousFrame, pointsCurrentFrame, thresholdNumberFeatures, init);
+    std::vector<uchar> status = VO.trackFeatures(prevImageLeft, image_left, pointsPreviousFrame, pointsCurrentFrame, thresholdNumberFeatures, init);
+    std::vector<cv::Point2f> trackedPrevFramePoints, trackedCurrFramePoints;
+    std::vector<int> indices;
 
-    std::vector<cv::Point3f> points3DCurrentFrame = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
+    for (int i = 0; i < status.size(); i++){
+        if (status[i]){
+            trackedPrevFramePoints.push_back(pointsPreviousFrame[i]);
+            trackedCurrFramePoints.push_back(pointsCurrentFrame[i]);
+            indices.push_back(i);
+        }
+    }
+
+    std::vector<cv::Point3f> points3DCurrentFrame = VO.get3DCoordinates(trackedCurrFramePoints, disparity_map, K);
+    map.addObservations(indices, trackedCurrFramePoints, false);
 
     //VO.estimatePose2D2D(pointsPreviousFrame, pointsCurrentFrame, K, pose);
-    VO.estimatePose3D2D(points3DCurrentFrame, pointsPreviousFrame, K, pose);
+    VO.estimatePose3D2D(points3DCurrentFrame, trackedPrevFramePoints, K, pose);
+
+    map.updateCumulativePose(pose);
+
+    int keyFrameStep = 10;
+    int numKeyFrames = 25;
 
     if (init){
+        std::cout << "REINITIALIZATION" << std::endl;
         pointsCurrentFrame.clear();
         cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
         cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
+
+        std::vector<int> indices(pointsCurrentFrame.size());
+        std::iota(indices.begin(), indices.end(), 0);
+
+        map.addObservations(indices, pointsCurrentFrame, true);
+
+        std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
+        map.addPoints3D(points3D);
+    }
+
+    map.updateCameraIndex();
+
+    if (map.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep) == 0 && map.getCurrentCameraIndex() > 0){
+        std::string fileName = "BAFile" + std::to_string(map.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + ".txt";
+        map.writeBAFile(fileName, keyFrameStep, numKeyFrames);
     }
 
     pointsPreviousFrame.clear();

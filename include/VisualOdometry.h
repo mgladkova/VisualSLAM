@@ -53,6 +53,6 @@ class VisualOdometry {
         void estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose);
         void estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3d& pose);
 
-        void trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& currFramePoints, std::vector<cv::Point2f>& prevFramePoints,
+        std::vector<uchar> trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& currFramePoints, std::vector<cv::Point2f>& prevFramePoints,
                            const int thresholdNumberFeatures, bool& initialize);
 };

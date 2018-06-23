@@ -5,11 +5,11 @@
 
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
+#include <algorithm>    // std::iota
 
 class VisualSLAM {
 private:
 	Map map;
-//	Map map;
     BundleAdjuster BA;
     VisualOdometry VO;
     Eigen::Matrix3d K;
@@ -22,6 +22,8 @@ public:
     int getNumberPoses() const;
     Eigen::Matrix3d getCameraMatrix() const;
     double getFocalLength() const;
+
+    std::vector<cv::Point3f> getStructure3D() const;
 
 	void readCameraIntrisics(std::string camera_intrinsics_file);
     void readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData);

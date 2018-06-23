@@ -19,3 +19,4 @@ void plot2DPoints(cv::Mat image, std::vector<cv::Point2f> points2d);
 void plot2DPoints(cv::Mat image, std::vector<cv::KeyPoint> keypoints);
 void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated,
                             Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Sophus::SE3d pose, Eigen::Matrix3d& cumR);
+void showPointCloud(const std::vector<cv::Point3f> points3D);

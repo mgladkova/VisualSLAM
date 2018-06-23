@@ -267,29 +267,29 @@ void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vecto
     pose = Sophus::SE3d(R, t);
 }
 
-void VisualOdometry::trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& prevFramePoints, std::vector<cv::Point2f>& currFramePoints,
+std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& prevFramePoints, std::vector<cv::Point2f>& currFramePoints,
                                    const int thresholdNumberFeatures, bool& initialize){
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
-    cv::Size subPixWinSize(10,10), winSize(31,31);
+    cv::Size winSize(31,31);
 
     std::vector<uchar> status;
     std::vector<float> err;
 
     cv::calcOpticalFlowPyrLK(prevFrame, currFrame, prevFramePoints, currFramePoints, status, err, winSize, 3, termcrit, 0, 0.001);
-    std::vector<cv::Point2f> trackedPrevFramePoints, trackedCurrFramePoints;
+    int numTracked = 0;
     for (int i = 0; i < status.size(); i++){
         if (status[i]){
-            trackedPrevFramePoints.push_back(prevFramePoints[i]);
-            trackedCurrFramePoints.push_back(currFramePoints[i]);
+            numTracked++;
         }
     }
 
-    if (trackedCurrFramePoints.size() < thresholdNumberFeatures){
+    std::cout << "Tracked size: " << numTracked << " / " << status.size() << std::endl;
+
+    if (numTracked < thresholdNumberFeatures){
         initialize = true;
     } else {
         initialize = false;
     }
 
-    std::swap(currFramePoints,trackedCurrFramePoints);
-    std::swap(prevFramePoints,trackedPrevFramePoints);
+    return status;
 }

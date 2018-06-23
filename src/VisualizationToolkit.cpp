@@ -96,7 +96,7 @@ void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translG
         translGTAccumulated = groundTruthPose.translation();
         translEstimAccumulated = -pose.translation();
     } else {
-        translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(-1*groundTruthPrevPose.translation() + groundTruthPose.translation());
+        translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
         translEstimAccumulated = translEstimAccumulated - cumR.inverse()*pose.translation();
     }
     cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
@@ -166,4 +166,45 @@ void visualizeAllPoses(std::vector<Sophus::SE3d> historyPoses, Eigen::Matrix3d K
         pangolin::FinishFrame();
         usleep(5000);   // sleep 5 ms
     }
+}
+
+void showPointCloud(const std::vector<cv::Point3f> points3D) {
+
+    if (points3D.empty()) {
+        throw std::runtime_error("Point cloud is empty!");
+    }
+
+    pangolin::CreateWindowAndBind("Point Cloud Viewer", 1024, 768);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    pangolin::OpenGlRenderState s_cam(
+            pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
+            pangolin::ModelViewLookAt(0, -0.1, -1.8, 0, 0, 0, 0.0, -1.0, 0.0)
+    );
+
+    pangolin::View &d_cam = pangolin::CreateDisplay()
+            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
+            .SetHandler(new pangolin::Handler3D(s_cam));
+
+    while (pangolin::ShouldQuit() == false) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        d_cam.Activate(s_cam);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+        glPointSize(2);
+        glBegin(GL_POINTS);
+
+        for (auto &p: points3D) {
+            glColor3f(0.0, 0.0, 1.0);
+            glVertex3d(p.x, p.y, p.z);
+        }
+
+        glEnd();
+        pangolin::FinishFrame();
+        usleep(5000);   // sleep 5 ms
+    }
+    return;
 }

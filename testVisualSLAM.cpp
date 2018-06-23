@@ -57,10 +57,11 @@ int main(int argc, char** argv){
 		if (image_right.cols == 0 || image_right.rows == 0){
 			throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
 		}
-        //Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
-        Sophus::SE3d pose = slam.performFrontEndStep(image_left, image_right, keypoints, descriptors);
+        Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
+        plot2DPoints(image_left, pointsCurrentFrame);
+        //Sophus::SE3d pose = slam.performFrontEndStep(image_left, image_right, keypoints, descriptors);
         std::cout << pose.matrix() << std::endl;
-        plot2DPoints(image_left, keypoints);
+        //plot2DPoints(image_left, keypoints);
         if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
             if (i == 0){
                 Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
@@ -74,6 +75,7 @@ int main(int argc, char** argv){
 
     cv::imwrite("result_trajectories.png", window);
 
+    showPointCloud(slam.getStructure3D());
     //visualizeAllPoses();
     return 0;
 }
