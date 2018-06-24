@@ -78,6 +78,7 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
     prepareDataForBA(map, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices, points3DArray, cameraPose);
 
     ceres::Problem problem;
+    ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
         for (int j = 0; j < observations[i].size(); j++){
@@ -88,13 +89,15 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
             //std::cout << cameraPose + 7*cameraIndex << " " << cameraPose[7*cameraIndex] << std::endl;
             //std::cout << points3DArray + 3*pointIndex << " " << points3DArray[3*pointIndex] << std::endl;
 
-            problem.AddResidualBlock(cost_fun, NULL, &(cameraPose[7*cameraIndex]), &(points3DArray[3*pointIndex]));
+            problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose[7*cameraIndex]), &(points3DArray[3*pointIndex]));
         }
     }
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = true;
+    options.gradient_tolerance = 1e-16;
+    options.function_tolerance = 1e-16;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
