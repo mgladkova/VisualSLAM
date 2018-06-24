@@ -171,8 +171,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
 
     map.updateCumulativePose(pose);
 
-    int keyFrameStep = 10;
-    int numKeyFrames = 25;
+    int keyFrameStep = 5;
+    int numKeyFrames = 5;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -194,6 +194,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     if (map.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep) == 0 && map.getCurrentCameraIndex() > 0){
         std::string fileName = "BAFile" + std::to_string(map.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + ".txt";
         map.writeBAFile(fileName, keyFrameStep, numKeyFrames);
+        BA.optimizeCameraPosesForKeyframes(map, keyFrameStep, numKeyFrames);
     }
 
     pointsPreviousFrame.clear();

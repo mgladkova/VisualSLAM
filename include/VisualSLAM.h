@@ -1,7 +1,5 @@
-#include "Map.h"
 #include "BundleAdjuster.h"
 #include "VisualOdometry.h"
-#include "VisualizationToolkit.h"
 
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
