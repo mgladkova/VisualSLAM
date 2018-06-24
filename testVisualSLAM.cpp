@@ -1,4 +1,5 @@
 #include "VisualSLAM.h"
+#include "GlobalParam.h"
 
 int main(int argc, char** argv){
 
@@ -63,7 +64,8 @@ int main(int argc, char** argv){
             }
         }
     }
-
-    //slam.visualizeAllPoses();
+#ifdef VIS_ALL_POSES
+    slam.visualizeAllPoses();
+#endif
     return 0;
 }
