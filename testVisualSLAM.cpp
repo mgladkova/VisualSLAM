@@ -1,10 +1,10 @@
 #include "VisualSLAM.h"
 #include "GlobalParam.h"
+#include "VisualizationToolkit.h"
 #include <opencv2/viz.hpp>
 #include <pangolin/pangolin.h>
 #include <iostream>
 #include <fstream>
-
 
 int main(int argc, char** argv){
 
@@ -154,9 +154,5 @@ int main(int argc, char** argv){
 #ifdef VIS_POINT_CLOUD
     showPointCloud(slam.getStructure3D());
 #endif
-#ifdef VIS_ALL_POSES
-    slam.visualizeAllPoses();
-#endif
-
     return 0;
 }
