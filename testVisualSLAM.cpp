@@ -1,8 +1,10 @@
 #include "VisualSLAM.h"
+#include "GlobalParam.h"
 #include <opencv2/viz.hpp>
 #include <pangolin/pangolin.h>
 #include <iostream>
 #include <fstream>
+
 
 int main(int argc, char** argv){
 
@@ -146,9 +148,15 @@ int main(int argc, char** argv){
         usleep(5000);
     }
 
-    //cv::imwrite("result_trajectories.png", window);
+#ifdef VIS_TRAJECTORY
+    cv::imwrite("result_trajectories.png", window);
+#endif
+#ifdef VIS_POINT_CLOUD
+    showPointCloud(slam.getStructure3D());
+#endif
+#ifdef VIS_ALL_POSES
+    slam.visualizeAllPoses();
+#endif
 
-    //showPointCloud(slam.getStructure3D());
-    //visualizeAllPoses();
     return 0;
 }
