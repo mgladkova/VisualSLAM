@@ -5,11 +5,11 @@ VisualSLAM::VisualSLAM() {
 }
 
 Sophus::SE3d VisualSLAM::getPose(int index) {
-    if (index < 0 || index >= historyPoses.size()){
+    if (index < 0 || index >= map.getCumPoses().size()){
         throw std::runtime_error("VisualSLAM::getPose() : Index out of bounds");
     }
 
-    return historyPoses.at(index);
+    return map.getCumPoses().at(index);
 }
 
 int VisualSLAM::getNumberPoses() const{

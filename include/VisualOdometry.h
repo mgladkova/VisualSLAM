@@ -2,7 +2,6 @@
 #include <Eigen/Dense>
 #include <sophus/se3.hpp>
 #include <opencv2/ximgproc/disparity_filter.hpp>
-#include <pangolin/pangolin.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
