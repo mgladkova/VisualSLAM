@@ -154,9 +154,5 @@ int main(int argc, char** argv){
 #ifdef VIS_POINT_CLOUD
     showPointCloud(slam.getStructure3D());
 #endif
-#ifdef VIS_ALL_POSES
-    slam.visualizeAllPoses();
-#endif
-
     return 0;
 }
