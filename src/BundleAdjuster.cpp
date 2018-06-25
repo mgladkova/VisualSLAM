@@ -1,68 +1,106 @@
 #include "BundleAdjuster.h"
 
-typedef Eigen::Matrix<double, 6, 1> Vector6d;
-typedef Eigen::Matrix<double, 6, 6> Matrix66d;
-
 BundleAdjuster::BundleAdjuster() {}
 
-Sophus::SE3d BundleAdjuster::optimizeLocalPoseBA_ceres(std::vector<cv::Point3d> p3d,std::vector<cv::Point2d> p2d, Eigen::Matrix3d K,Sophus::SE3d pose)
-{
-        assert(p3d.size() == p2d.size());
+void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* camera){
+    std::vector<cv::Point3f> structure3D = map.getStructure3D();
 
-        Sophus::SE3d T_esti(pose); // estimated pose
-        Eigen::Matrix3d R = T_esti.so3().matrix();
-        Eigen::Vector3d t = T_esti.translation();
+    if (structure3D.empty()){
+        throw std::runtime_error("prepareDataForBA() : No structure data is stored!");
+    }
 
-        Eigen::Quaterniond q_rotation(R) ;
+    std::vector<Sophus::SE3d> cameraCumPoses = map.getCumPoses();
 
-        //local BA
-        ceres::Problem problem;
-        //ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization();
-        //double array for ceres
-        int numPoints3D = p3d.size();
-        double translation[3] = {t[0], t[1], t[2]};
-        double points3D[numPoints3D][3];
+    /*for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
+        Sophus::SE3d cameraPose = cameraCumPoses[i];
+        Eigen::Quaterniond q(cameraPose.so3().matrix());
+        Eigen::Vector3d t = cameraPose.translation();
+        int cameraIndex = (i - startFrame) / keyFrameStep;
+        cameraRotations[4*cameraIndex] = q.w();
+        cameraRotations[4*cameraIndex + 1] = q.x();
+        cameraRotations[4*cameraIndex + 2] = q.y();
+        cameraRotations[4*cameraIndex + 3] = q.z();
+        cameraTranslations[3*cameraIndex] = t[0];
+        cameraTranslations[3*cameraIndex + 1] = t[1];
+        cameraTranslations[3*cameraIndex + 2] = t[2];
+    }*/
 
-        double camera[4];
-        camera[0] = q_rotation.w();
-        camera[1] = q_rotation.x();
-        camera[2] = q_rotation.y();
-        camera[3] = q_rotation.z();
+    for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
+        Eigen::Matrix3d rotation = cameraCumPoses[i].so3().matrix();
+        Eigen::Vector3d t = cameraCumPoses[i].translation();
 
-        // not required, keeping it for reference
-        // double cameraRotation[4] = {q_rotation.w(), q_rotation.x(), q_rotation.y(), q_rotation.z()};
-        // problem.AddParameterBlock(cameraRotation, 4, local_parameterization);
-        // problem.AddParameterBlock(translation, 3);
+        Eigen::Quaterniond q(rotation);
 
-        // add 3 D points
-        for (int i = 0; i < numPoints3D; ++i){
-            points3D[i][0] = p3d[i].x;
-            points3D[i][1] = p3d[i].y;
-            points3D[i][2] = p3d[i].z;
+        int cameraIndex = (i - startFrame) / keyFrameStep;
+
+        camera[7*cameraIndex] = q.w();
+        camera[7*cameraIndex + 1] = q.x();
+        camera[7*cameraIndex + 2] = q.y();
+        camera[7*cameraIndex + 3] = q.z();
+        camera[7*cameraIndex + 4] = t[0];
+        camera[7*cameraIndex + 5] = t[1];
+        camera[7*cameraIndex + 6] = t[2];
+    }
+
+    int k = 0;
+
+    for (auto it = pointIndices.begin(); it != pointIndices.end(); it++){
+        if ((*it) < 0 || (*it) >= structure3D.size()){
+            throw std::runtime_error("prepareDataForBA() : Index for 3D point is out of bounds!");
         }
+        points3D[3*k] = structure3D[*it].x;
+        points3D[3*k + 1] = structure3D[*it].y;
+        points3D[3*k + 2] = structure3D[*it].z;
+        k++;
+    }
+}
 
-        for (int j = 0; j < p2d.size(); j++){
-            ceres::CostFunction* cost_function = ReprojectionError3D::Create(p2d[j].x, p2d[j].y);
-            problem.AddResidualBlock(cost_function, NULL, camera, translation, points3D[j]);
+void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames){
+    int currentCameraIndex = map.getCurrentCameraIndex();
+    int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
+
+    if (startFrame < 0){
+        throw std::runtime_error("prepareDataForBA() : Start frame index out of bounds!");
+    }
+
+    std::set<int> uniquePointIndices;
+    std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = map.getObservations();
+
+    for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
+        for (int j = 0; j < observations[i].size(); j++){
+            uniquePointIndices.insert(observations[i][j].first);
         }
+    }
 
-        // Solver::Options options;
-        ceres::Solver::Options options;
-        options.preconditioner_type = ceres::SCHUR_JACOBI;
-        options.linear_solver_type = ceres::DENSE_SCHUR;
-        options.minimizer_progress_to_stdout = false;
-        // options.max_solver_time_in_seconds = 0.2;
-        ceres::Solver::Summary summary;
-        ceres::Solve(options, &problem, &summary);
-        //std::cout << summary.BriefReport() << "\n";
-        //std::cout << "Final rotation: " << rotation << " Final translation: " << translation << "\n";
-        //std::cout << "Final   m: " << m << " c: " << c << "\n";
+    double points3DArray[3*uniquePointIndices.size()];
+    double cameraPose[7*numKeyFrames];
 
-        Eigen::Quaterniond quaterniond_(camera[0], camera[1], camera[2], camera[3]);
+    prepareDataForBA(map, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices, points3DArray, cameraPose);
 
-        std::cout << camera[4] << " " << camera[5] << " " << camera[6] << std::endl;
-        Eigen::Vector3d translation_(translation[0],translation[1],translation[2]);
-        Sophus::SE3d cameraTransform(quaterniond_,translation_);
-        //std::cout << SE3_quaternion.matrix() << std::endl;
-        return cameraTransform;
+    ceres::Problem problem;
+    ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
+
+    for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
+        for (int j = 0; j < observations[i].size(); j++){
+            // x and y coordinates of each observed point are stored consecutively
+            ceres::CostFunction* cost_fun = ReprojectionError::Create(observations[i][j].second.x, observations[i][j].second.y);
+            int pointIndex = std::distance(uniquePointIndices.begin(), uniquePointIndices.find(observations[i][j].first));
+            int cameraIndex = (i - startFrame) / keyFrameStep;
+            //std::cout << cameraPose + 7*cameraIndex << " " << cameraPose[7*cameraIndex] << std::endl;
+            //std::cout << points3DArray + 3*pointIndex << " " << points3DArray[3*pointIndex] << std::endl;
+
+            problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose[7*cameraIndex]), &(points3DArray[3*pointIndex]));
+        }
+    }
+
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_SCHUR;
+    options.minimizer_progress_to_stdout = true;
+    options.gradient_tolerance = 1e-16;
+    options.function_tolerance = 1e-16;
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+    std::cout << summary.FullReport() << "\n";
+
+    // TO-DO: store new data
 }

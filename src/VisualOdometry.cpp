@@ -6,11 +6,11 @@
 
 VisualOdometry::VisualOdometry(){}
 
-void VisualOdometry::setReferenceFrame(const cv::Mat image, const cv::Mat disparity_map, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptor){
+void VisualOdometry::setReferenceFrame(const cv::Mat image, const cv::Mat disparity_map, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptors){
     image.copyTo(refFrame.image);
     disparity_map.copyTo(refFrame.disparity_map);
     refFrame.keypoints = keypoints;
-    descriptor.copyTo(refFrame.descriptor);
+    refFrame.descriptor = descriptors;
 }
 
 KeyFrame VisualOdometry::getReferenceFrame() const {
@@ -23,6 +23,11 @@ void VisualOdometry::setPose(const Sophus::SE3d pose){
 
 Sophus::SE3d VisualOdometry::getPose() const{
     return pose;
+}
+
+void VisualOdometry::setKeyFrameKeypoints(std::vector<cv::KeyPoint> updatedKeypoints){
+    refFrame.keypoints.clear();
+    refFrame.keypoints = updatedKeypoints;
 }
 
 
@@ -53,6 +58,8 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
 
     cv::Ptr<cv::stereo::StereoBinarySGBM> sgbm = cv::stereo::StereoBinarySGBM::create(min_disparity, number_of_disparities, kernel_size);
     // setting the penalties for sgbm
+    sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
+
     sgbm->setP1(8*std::pow(kernel_size, 2));
     sgbm->setP2(32*std::pow(kernel_size, 2));
     sgbm->setMinDisparity(min_disparity);
@@ -67,7 +74,7 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
     ROI = computeROIDisparityMap(image_left.size(),sgbm);
     cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
     wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
-    wls_filter->setDepthDiscontinuityRadius(1);
+    wls_filter->setDepthDiscontinuityRadius(2);
 
     sgbm->compute(image_left, image_right, disparity);
     wls_filter->setLambda(8000.0);
@@ -81,23 +88,25 @@ cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat 
     cv::imshow("filtered disparity", filtered_disp_vis);
     cv::waitKey();
     */
-    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
+    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
     return true_dmap;
 }
 
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
-    int max_features = 500;
+    int max_features = 2000;
 	// Detect ORB features and compute descriptors.
     cv::Ptr<cv::Feature2D> orb = cv::ORB::create(max_features);
-    orb->detectAndCompute(frame_new, cv::Mat(), keypoints_new, descriptors_new);
+    orb->detect(frame_new, keypoints_new);
+    orb->compute(frame_new, keypoints_new, descriptors_new);
 }
 
-std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new){
+std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypointsPrevFrame, std::vector<cv::KeyPoint> keypointsCurrentFrame,
+                                                                  cv::Mat descriptorsPrevFrame, cv::Mat descriptorsCurrentFrame){
     const float good_match_ratio = 0.8;
     std::vector<cv::DMatch> matches;
 
     cv::Ptr<cv::DescriptorMatcher>  matcher = cv::DescriptorMatcher::create("BruteForce-Hamming(2)");
-    matcher->match(refFrame.descriptor, descriptors_new, matches);
+    matcher->match(descriptorsPrevFrame, descriptorsCurrentFrame, matches);
 
     // Sort matches by score
     std::sort(matches.begin(), matches.end());
@@ -108,54 +117,96 @@ std::vector<cv::DMatch> VisualOdometry::findGoodORBFeatureMatches(std::vector<cv
     return matches;
 }
 
-void VisualOdometry::get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches,
-                                            std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d,
-                                            cv::Mat disparity_map, Eigen::Matrix3d K){
-    if (matches.empty()){
-        throw std::runtime_error("get3d2dCorrespondences() : Input vector with keypoint matching is empty");
+std::vector<cv::Point2d> VisualOdometry::get2DPointsKeyFrame(){
+    std::vector<cv::Point2d> points;
+    for (auto& kpt : refFrame.keypoints){
+        points.push_back(kpt.pt);
     }
 
-    double b = 0.53716;
-    double fx = K(0,0);
-    double fy = K(1,1);
-    double cx = K(0,2);
-    double cy = K(1,2);
-
-    double f = (fx + fy) / 2;
-    // prepare data
-    for (auto &m: matches) {
-        cv::Point2d p1 = refFrame.keypoints[m.queryIdx].pt;
-        cv::Point2d p2 = keypoints_new[m.trainIdx].pt;
-        float disparity = refFrame.disparity_map.at<float>(p1.y, p1.x);
-        if (disparity){
-           double z = f*b/disparity;
-           double x = z*(p1.x - cx) / fx;
-           double y = z*(p1.y - cy) / fy;
-           //std::cout << x << " " << y << " " << z << std::endl;
-           cv::Point3d p1_3d(x, y, z);
-           p3d.push_back(p1_3d);
-           p2d.push_back(p2);
-        }
-    }
-
-    //computeAndShowPointCloud(refFrame.image, refFrame.disparity_map, b, K);
+    return points;
 }
 
-void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2){
+std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K){
+    std::vector<cv::Point2f> points2D;
+
+    for (auto& keyPt: keypoints){
+        points2D.push_back(keyPt.pt);
+    }
+
+    return get3DCoordinates(points2D, disparity_map, K);
+}
+
+std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K){
+    float b = 0.53716;
+    float fx = K(0,0);
+    float fy = K(1,1);
+    float cx = K(0,2);
+    float cy = K(1,2);
+
+    float f = (fx + fy) / 2;
+    std::vector<cv::Point3f> points3D;
+
+    cv::Mat mask = disparity_map > 0;
+
+    double minPosValue;
+    cv::minMaxLoc(disparity_map, &minPosValue, NULL, NULL, NULL, mask);
+
+    for (int i = 0; i < points2D.size(); i++) {
+        cv::Point2f p = points2D[i];
+        float disparity = disparity_map.at<float>(p.y, p.x);
+        if (disparity < 0.1){
+            // compute the average depth over the path around the point
+            float neighborDisparities[4] = {0};
+            if (p.x - 1 >= 0){
+                neighborDisparities[0] = disparity_map.at<float>(p.y, p.x - 1);
+            }
+
+            if (p.y - 1 >= 0){
+                neighborDisparities[1] = disparity_map.at<float>(p.y - 1, p.x);
+            }
+
+            if (p.x + 1 < disparity_map.cols){
+                neighborDisparities[2] = disparity_map.at<float>(p.y, p.x + 1);
+            }
+
+            if (p.y + 1 < disparity_map.rows){
+                neighborDisparities[3] = disparity_map.at<float>(p.y + 1, p.x);
+            }
+
+            disparity = (neighborDisparities[0] + neighborDisparities[1] + neighborDisparities[2] + neighborDisparities[3]) / 4;
+        }
+
+        if (disparity < 0.1){
+            disparity = minPosValue;
+        }
+
+        float z = f*b/disparity;
+        float x = z*(p.x - cx) / fx;
+        float y = z*(p.y - cy) / fy;
+
+        //std::cout << x << " " << y << " " << z << " " << disparity << std::endl;
+
+        points3D.push_back(cv::Point3f(x,y,z));
+    }
+
+    return points3D;
+}
+
+void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsPrevFrame, std::vector<cv::KeyPoint> keypointsCurrentFrame, std::vector<cv::DMatch> matches, std::vector<cv::Point2f>& p2dPrevFrame, std::vector<cv::Point2f>& p2dCurrentFrame){
     if (matches.empty()){
         throw std::runtime_error("get2d2dCorrespondences() : Input vector with keypoint matching is empty");
     }
 
     for (auto &m: matches) {
-        cv::Point2f p1 = refFrame.keypoints[m.queryIdx].pt;
-        cv::Point2f p2 = keypoints_new[m.trainIdx].pt;
+        cv::Point2d p1 = keypointsPrevFrame[m.queryIdx].pt;
+        cv::Point2d p2 = keypointsCurrentFrame[m.trainIdx].pt;
 
-        p2d_1.push_back(p1);
-        p2d_2.push_back(p2);
+        p2dPrevFrame.push_back(p1);
+        p2dCurrentFrame.push_back(p2);
     }
 }
 
-std::vector<int> VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<cv::Point2d> p2d, Eigen::Matrix3d K){
+void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose){
     cv::Mat cameraMatrix;
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
     cv::Mat rvec,tvec,rot_matrix;
@@ -164,28 +215,48 @@ std::vector<int> VisualOdometry::estimatePose3D2D(std::vector<cv::Point3d> p3d, 
     cv::eigen2cv(K, cameraMatrix);
 
     std::vector<int> inliers;
-    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 5.0, 0.99, inliers);
+    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 4.0, 0.99, inliers);
+
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
         cv::cv2eigen(rot_matrix, R);
         cv::cv2eigen(tvec,t);
     }
-    pose = Sophus::SE3d(R, t).inverse();
-    std::cout << "3D-2D Pnp solved Pose: "<<std::endl<< pose.matrix() << std::endl;
 
-    return inliers;
+    std::sort(inliers.begin(), inliers.end());
+
+    std::vector<cv::Point2f> p2d_filtered;
+    std::vector<cv::Point3f> p3d_filtered;
+
+    for (int i = 0; i < inliers.size(); i++){
+        std::vector<cv::Point3f>::iterator it_3D = p3d.begin() + inliers[i];
+        std::vector<cv::Point2f>::iterator it_2D = p2d.begin() + inliers[i];
+
+        p3d_filtered.push_back(*it_3D);
+        p2d_filtered.push_back(*it_2D);
+    }
+
+    std::swap(p3d, p3d_filtered);
+    std::swap(p2d, p2d_filtered);
+
+    Sophus::SE3d newPose = Sophus::SE3d(R, t).inverse();
+
+    int MAX_POSE_NORM = 100;
+    if (newPose.log().norm() <= MAX_POSE_NORM){
+        pose = newPose;
+    }
 }
 
-void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2d> p2d_1, std::vector<cv::Point2d> p2d_2, Eigen::Matrix3d K){
+void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3d& pose){
     cv::Mat tvec,rot_matrix;
     cv::Mat cameraMatrix;
-    Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d R;
     Eigen::Vector3d t;
 
     cv::eigen2cv(K, cameraMatrix);
 
-    double focal = (K(0,0) + K(1,1)) / 2;
-    cv::Point2d princip_point = cv::Point2d(K(0,2), K(1,2));
+    float focal = (K(0,0) + K(1,1)) / 2;
+    cv::Point2f princip_point = cv::Point2f(K(0,2), K(1,2));
 
     cv::Mat E = cv::findEssentialMat(p2d_1, p2d_2, focal, princip_point);
     cv::recoverPose(E, p2d_1, p2d_2, cameraMatrix, rot_matrix, tvec);
@@ -194,68 +265,31 @@ void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2d> p2d_1, std::vecto
     cv::cv2eigen(tvec,t);
 
     pose = Sophus::SE3d(R, t);
-
-    std::cout << pose.matrix() << std::endl;
 }
 
-void VisualOdometry::trackFeatures(){
-	// TODO
-}
+std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& prevFramePoints, std::vector<cv::Point2f>& currFramePoints,
+                                   const int thresholdNumberFeatures, bool& initialize){
+    cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
+    cv::Size winSize(31,31);
 
-void VisualOdometry::computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity, const float baseline, Eigen::Matrix3d K) {
-    std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>> pointcloud;
-    double fx = K(0,0);
-    double fy = K(1,1);
-    double cx = K(0,2);
-    double cy = K(1,2);
+    std::vector<uchar> status;
+    std::vector<float> err;
 
-    // TODO Compute point cloud using disparity
-    // NOTE if your computer is slow, change v++ and u++ to v++2 and u+=2 to generate a sparser point cloud
-    for (int v = 0; v < image_left.rows; v++)
-        for (int u = 0; u < image_left.cols; u++) {
-            /// start your code here (~6 lines)
-
-            double z = fx*baseline/(disparity.at<float>(v,u));
-            double x = (u - cx)*z / fx;
-            double y = (v - cy)*z / fy;
-
-            Eigen::Vector4d point(x, y, z,
-                           image_left.at<uchar>(v, u) / 255.0); // first three components are XYZ and the last is color
-            pointcloud.push_back(point);
-            /// end your code here
+    cv::calcOpticalFlowPyrLK(prevFrame, currFrame, prevFramePoints, currFramePoints, status, err, winSize, 3, termcrit, 0, 0.001);
+    int numTracked = 0;
+    for (int i = 0; i < status.size(); i++){
+        if (status[i]){
+            numTracked++;
         }
-
-    // draw the point cloud
-
-    pangolin::CreateWindowAndBind("Point Cloud Viewer", 1024, 768);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    pangolin::OpenGlRenderState s_cam(
-            pangolin::ProjectionMatrix(1024, 768, 500, 500, 512, 389, 0.1, 1000),
-            pangolin::ModelViewLookAt(0, -0.1, -1.8, 0, 0, 0, 0.0, -1.0, 0.0)
-    );
-
-    pangolin::View &d_cam = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
-            .SetHandler(new pangolin::Handler3D(s_cam));
-
-    while (pangolin::ShouldQuit() == false) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        d_cam.Activate(s_cam);
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-        glPointSize(2);
-        glBegin(GL_POINTS);
-        for (auto &p: pointcloud) {
-            glColor3f(p[3], p[3], p[3]);
-            glVertex3d(p[0], p[1], p[2]);
-        }
-        glEnd();
-        pangolin::FinishFrame();
-        usleep(5000);   // sleep 5 ms
     }
-    return;
+
+    std::cout << "Tracked size: " << numTracked << " / " << status.size() << std::endl;
+
+    if (numTracked < thresholdNumberFeatures){
+        initialize = true;
+    } else {
+        initialize = false;
+    }
+
+    return status;
 }
