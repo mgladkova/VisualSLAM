@@ -14,7 +14,7 @@ Visual-based Navigation project
 mkdir build
 cmake ..
 make
-./slam ../data/left ../data/right 10 [../data/groundTruth.txt]
+./slam ../data/left/ ../data/right/ ../data/calib.txt 10 [../data/groundTruth.txt]
 
 ## only 22 for visualization otherwise we can only see pose data
 ./slam ../data/left/ ../data/right/ ../data/calib.txt 22
