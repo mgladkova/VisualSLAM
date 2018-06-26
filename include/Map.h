@@ -21,10 +21,13 @@ public:
     void addPoints3D(std::vector<cv::Point3f> points3D);
     void addObservations(std::vector<int> indices, std::vector<cv::Point2f> observedPoints, bool newBatch);
     void updateCumulativePose(Sophus::SE3d newTransform);
+    void updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera);
+    void setCameraPose(const int i, const Sophus::SE3d newPose);
 
     std::vector<cv::Point3f> getStructure3D() const;
     std::map<int, std::vector<std::pair<int, cv::Point2f>>> getObservations() const;
     std::vector<Sophus::SE3d> getCumPoses() const;
+    Sophus::SE3d getCumPoseAt(int index) const;
 
     int getCurrentCameraIndex() const;
     void updateCameraIndex();

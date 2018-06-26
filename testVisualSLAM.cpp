@@ -41,8 +41,7 @@ int main(int argc, char** argv){
     cv::Mat descriptors;
     Eigen::Matrix3d cumR = Eigen::Matrix3d::Identity();
 
-    int k = 1;
-
+#ifdef VIS_POINTCLOUD
     pangolin::CreateWindowAndBind("Point Cloud Viewer", 1024, 768);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -56,7 +55,7 @@ int main(int argc, char** argv){
     pangolin::View &d_cam = pangolin::CreateDisplay()
             .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
             .SetHandler(new pangolin::Handler3D(s_cam));
-
+#endif
     float sz = 0.7;
     int width = 640, height = 480;
     Eigen::Matrix3d K = slam.getCameraMatrix();
@@ -65,7 +64,9 @@ int main(int argc, char** argv){
     float cx = K(0,2);
     float cy = K(1,2);
 
-    for (int i = 0; i < num_images && pangolin::ShouldQuit() == false; i++){
+    int k = 1;
+
+    for (int i = 0; i < num_images; i++){
 
         if (i == std::pow(10, k)){
             image_name_template = image_name_template.substr(0, image_name_template.length() - 1);
@@ -89,22 +90,25 @@ int main(int argc, char** argv){
         Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
         plot2DPoints(image_left, pointsCurrentFrame);
 
-        if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
-            if (i == 0){
-                Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
-                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, pose, cumR);
-            } else {
-                std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
-                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], pose, cumR);
-            }
-        }
-
-        std::vector<cv::Point3f> pointCloud = slam.getStructure3D();
-
         Sophus::SE3d cumPose;
         if (i != 0){
             cumPose = slam.getPose(i);
         }
+#ifdef VIS_TRAJECTORY
+        if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
+            if (i == 0){
+                Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
+                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, cumR, pose);
+            } else {
+                std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
+                Sophus::SE3d prevCumPose = slam.getPose(i-1);
+                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], cumR, cumPose, prevCumPose);
+            }
+        }
+#endif
+
+#ifdef VIS_POINTCLOUD
+        std::vector<cv::Point3f> pointCloud = slam.getStructure3D();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         d_cam.Activate(s_cam);
@@ -146,13 +150,12 @@ int main(int argc, char** argv){
         glEnd();
         pangolin::FinishFrame();
         usleep(5000);
+#endif
     }
+#ifdef VIS_POSES
+    visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
+#endif
 
-#ifdef VIS_TRAJECTORY
     cv::imwrite("result_trajectories.png", window);
-#endif
-#ifdef VIS_POINT_CLOUD
-    showPointCloud(slam.getStructure3D());
-#endif
     return 0;
 }

@@ -12,6 +12,7 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
     for (int i = 0; i < points3D.size(); i++){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
         pointWorldCoord = cumPose.inverse()*pointWorldCoord;
+        //std::cout << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         structure3D.insert(structure3D.end(), cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]));
     }
 }
@@ -40,7 +41,7 @@ void Map::updateCumulativePose(Sophus::SE3d newTransform){
 
     assert(currentCameraIndex == cumPoses.size());
 
-    cumPoses.push_back(newTransform*cumPoses[currentCameraIndex - 1]);
+    cumPoses.push_back(newTransform.inverse()*cumPoses[currentCameraIndex - 1]);
 }
 
 int Map::getCurrentCameraIndex() const{
@@ -57,6 +58,37 @@ std::map<int, std::vector<std::pair<int, cv::Point2f>>> Map::getObservations() c
 
 std::vector<Sophus::SE3d> Map::getCumPoses() const{
     return cumPoses;
+}
+
+Sophus::SE3d Map::getCumPoseAt(int index) const{
+    if (index < 0 || index > cumPoses.size()){
+        throw std::runtime_error("getCumPoseAt() : Index out of bounds!");
+    }
+
+    return cumPoses[index];
+}
+
+void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
+    if (i < 0 || i >= cumPoses.size()){
+        throw std::runtime_error("setCameraPose() : Index is out of bounds!");
+    }
+    cumPoses[i].so3().matrix() = newPose.so3().matrix();
+    cumPoses[i].translation() = newPose.translation();
+}
+
+void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera){
+    if (uniquePointIndices.empty()){
+        throw std::runtime_error("updatePoints3D() : No point indices are given");
+    }
+
+    for (auto i = 0; i < uniquePointIndices.size(); i++){
+        if (i < 0 || i > structure3D.size()){
+            throw std::runtime_error("updatePoints3D() : index out of bounds!");
+        }
+        Eigen::Vector3d v(points3DArray[3*i], points3DArray[3*i + 1], points3DArray[3*i + 2]);
+        //v = firstCamera*v;
+        structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
+    }
 }
 
 void Map::updateCameraIndex(){

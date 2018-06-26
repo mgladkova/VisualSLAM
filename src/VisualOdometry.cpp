@@ -239,7 +239,7 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector
     std::swap(p3d, p3d_filtered);
     std::swap(p2d, p2d_filtered);
 
-    Sophus::SE3d newPose = Sophus::SE3d(R, t).inverse();
+    Sophus::SE3d newPose = Sophus::SE3d(R, t);
 
     int MAX_POSE_NORM = 100;
     if (newPose.log().norm() <= MAX_POSE_NORM){

@@ -88,16 +88,19 @@ void computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity,
 }
 
 void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated,
-                            Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Sophus::SE3d pose, Eigen::Matrix3d& cumR){
+                            Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3d estimPose,  Sophus::SE3d estimPrevPose){
     int offsetX = 300;
     int offsetY = 300;
 
+    Sophus::SE3d pose = estimPose.inverse();
+    Sophus::SE3d prevPose = estimPrevPose.inverse();
+
     if (index == 0){
         translGTAccumulated = groundTruthPose.translation();
-        translEstimAccumulated = -pose.translation();
+        translEstimAccumulated = pose.translation();
     } else {
         translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
-        translEstimAccumulated = translEstimAccumulated - cumR.inverse()*pose.translation();
+        translEstimAccumulated = translGTAccumulated + (pose.so3().inverse()*groundTruthPrevPose.so3())*(pose.translation() - prevPose.translation());
     }
     cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
     cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);

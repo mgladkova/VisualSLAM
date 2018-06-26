@@ -11,24 +11,13 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
 
     std::vector<Sophus::SE3d> cameraCumPoses = map.getCumPoses();
 
-    /*for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
-        Sophus::SE3d cameraPose = cameraCumPoses[i];
-        Eigen::Quaterniond q(cameraPose.so3().matrix());
-        Eigen::Vector3d t = cameraPose.translation();
-        int cameraIndex = (i - startFrame) / keyFrameStep;
-        cameraRotations[4*cameraIndex] = q.w();
-        cameraRotations[4*cameraIndex + 1] = q.x();
-        cameraRotations[4*cameraIndex + 2] = q.y();
-        cameraRotations[4*cameraIndex + 3] = q.z();
-        cameraTranslations[3*cameraIndex] = t[0];
-        cameraTranslations[3*cameraIndex + 1] = t[1];
-        cameraTranslations[3*cameraIndex + 2] = t[2];
-    }*/
+    Sophus::SE3d firstCameraCumPose = cameraCumPoses[startFrame];
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
-        Eigen::Matrix3d rotation = cameraCumPoses[i].so3().matrix();
-        Eigen::Vector3d t = cameraCumPoses[i].translation();
+        Sophus::SE3d cameraPose = cameraCumPoses[i];
 
+        Eigen::Matrix3d rotation = cameraPose.so3().matrix();
+        Eigen::Vector3d t = cameraPose.translation();
         Eigen::Quaterniond q(rotation);
 
         int cameraIndex = (i - startFrame) / keyFrameStep;
@@ -48,9 +37,11 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
         if ((*it) < 0 || (*it) >= structure3D.size()){
             throw std::runtime_error("prepareDataForBA() : Index for 3D point is out of bounds!");
         }
-        points3D[3*k] = structure3D[*it].x;
-        points3D[3*k + 1] = structure3D[*it].y;
-        points3D[3*k + 2] = structure3D[*it].z;
+
+        Eigen::Vector3d pointRelPose(structure3D[*it].x, structure3D[*it].y, structure3D[*it].z);
+        points3D[3*k] = pointRelPose[0];
+        points3D[3*k + 1] = pointRelPose[1];
+        points3D[3*k + 2] = pointRelPose[2];
         k++;
     }
 }
@@ -95,12 +86,26 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
-    options.minimizer_progress_to_stdout = true;
-    options.gradient_tolerance = 1e-16;
-    options.function_tolerance = 1e-16;
+    options.minimizer_progress_to_stdout = false;
+    options.max_num_iterations = 200;
+    options.function_tolerance = 1e-5;
+    options.dense_linear_algebra_library_type = ceres::LAPACK;
+
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    std::cout << summary.FullReport() << "\n";
+    std::cout << summary.BriefReport() << "\n";
 
-    // TO-DO: store new data
+    Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
+    map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
+
+    for (int i = startFrame; i < currentCameraIndex; i+=keyFrameStep){
+        int cameraIndex = (i - startFrame) / keyFrameStep;
+        Eigen::Quaterniond q(cameraPose[7*cameraIndex], cameraPose[7*cameraIndex + 1], cameraPose[7*cameraIndex + 2], cameraPose[7*cameraIndex + 3]);
+        Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
+
+        Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
+        std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
+        std::cout << "New pose " << i << " : " << newPose.matrix() << std::endl;
+        map.setCameraPose(i, newPose);
+    }
 }
