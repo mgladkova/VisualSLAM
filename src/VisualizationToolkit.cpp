@@ -100,7 +100,7 @@ void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translG
         translEstimAccumulated = pose.translation();
     } else {
         translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
-        translEstimAccumulated = translGTAccumulated + (pose.so3().inverse()*groundTruthPrevPose.so3())*(pose.translation() - prevPose.translation());
+        translEstimAccumulated = translGTAccumulated + (pose.so3().inverse()*prevPose.so3())*(pose.translation() - prevPose.translation());
     }
     cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
     cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
