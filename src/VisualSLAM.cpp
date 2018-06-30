@@ -122,8 +122,6 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_r
     return pose;
 }
 
-int iter = 0;
-
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat image_right, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImageLeft){
     int max_features = 500;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
@@ -135,8 +133,6 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     if (pointsPreviousFrame.empty()){
         cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, false, 0.04);
         cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
-
-        std::cout << "FRAME " << iter << std::endl;
 
         std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
 
@@ -225,6 +221,5 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     pointsPreviousFrame = pointsCurrentFrame;
 
     image_left.copyTo(prevImageLeft);
-    iter++;
     return pose;
 }

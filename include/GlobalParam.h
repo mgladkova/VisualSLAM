@@ -3,6 +3,6 @@
 
 // define options: comment out if not using
 #define VIS_TRAJECTORY
-#define VIS_POINT_CLOUD
+#define VIS_POINTCLOUD
 
 #endif
