@@ -12,8 +12,12 @@ Sophus::SE3d VisualSLAM::getPose(int index) {
     return map.getCumPoses().at(index);
 }
 
+std::vector<Sophus::SE3d> VisualSLAM::getPoses() const{
+    return map.getCumPoses();
+}
+
 int VisualSLAM::getNumberPoses() const{
-    return historyPoses.size();
+    return map.getCumPoses().size();
 }
 
 Eigen::Matrix3d VisualSLAM::getCameraMatrix() const {
@@ -118,6 +122,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_r
     return pose;
 }
 
+int iter = 0;
+
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat image_right, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImageLeft){
     int max_features = 500;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
@@ -127,10 +133,20 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     Sophus::SE3d pose;
     // the first image is received
     if (pointsPreviousFrame.empty()){
-        cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
+        cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, false, 0.04);
         cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
 
+        std::cout << "FRAME " << iter << std::endl;
+
         std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
+
+        int maxDistance = 150;
+        for (int i = 0; i < points3D.size(); i++){
+            if (points3D[i].z > maxDistance){
+                points3D.erase(points3D.begin() + i);
+                pointsCurrentFrame.erase(pointsCurrentFrame.begin() + i);
+            }
+        }
 
         std::vector<int> indices(pointsCurrentFrame.size());
         std::iota(indices.begin(), indices.end(), 0);
@@ -172,7 +188,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     map.updateCumulativePose(pose);
 
     int keyFrameStep = 5;
-    int numKeyFrames = 5;
+    int numKeyFrames = 10;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -180,12 +196,20 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
         cv::goodFeaturesToTrack(image_left, pointsCurrentFrame, max_features, 0.01, 10, cv::Mat(), 3, 3, 0, 0.04);
         cv::cornerSubPix(image_left, pointsCurrentFrame, subPixWinSize, cv::Size(-1,-1), termcrit);
 
+        std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
+
+        int maxDistance = 150;
+        for (int i = 0; i < points3D.size(); i++){
+            if (points3D[i].z > maxDistance){
+                points3D.erase(points3D.begin() + i);
+                pointsCurrentFrame.erase(pointsCurrentFrame.begin() + i);
+            }
+        }
+
         std::vector<int> indices(pointsCurrentFrame.size());
         std::iota(indices.begin(), indices.end(), 0);
 
         map.addObservations(indices, pointsCurrentFrame, true);
-
-        std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
         map.addPoints3D(points3D);
     }
 
@@ -201,5 +225,6 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     pointsPreviousFrame = pointsCurrentFrame;
 
     image_left.copyTo(prevImageLeft);
+    iter++;
     return pose;
 }

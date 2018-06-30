@@ -12,11 +12,11 @@ private:
     VisualOdometry VO;
     Eigen::Matrix3d K;
 
-    std::vector<Sophus::SE3d> historyPoses;
     std::vector<Sophus::SE3d> groundTruthData;
 public:
 	VisualSLAM();
     Sophus::SE3d getPose(int index);
+    std::vector<Sophus::SE3d> getPoses() const;
     int getNumberPoses() const;
     Eigen::Matrix3d getCameraMatrix() const;
     double getFocalLength() const;

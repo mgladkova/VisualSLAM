@@ -55,8 +55,8 @@ public:
         const T& cy = T(185.2157);
 
         // normalization into
-        T x = -p[0] / p[2];
-        T y = -p[1] / p[2];
+        T x = p[0] / p[2];
+        T y = p[1] / p[2];
 
         T project_x = focal*x + cx;
         T project_y = focal*y + cy;
