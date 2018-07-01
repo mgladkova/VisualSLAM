@@ -1,14 +1,20 @@
-#include <Eigen/Core>
+#include <sophus/se3.h>
 #include <vector>
 
-/**
- * Class Map is responsible for storing the 3D structure
- */
-class Map {
+
+
+class Map{
 private:
-	std::vector<Eigen::Vector3d> structure3D;
+    int test_a;
+    std::vector<Sophus::SE3> cumPose;
+    int poseIndex;
 
 public:
-	Map();
-	void updateStructure3d(); // update 3D point locations
+    Map();
+    int getValue();
+
+    void updateCumPose(Sophus::SE3 newPose);
+    void updatePoseIndex();
+
+    std::vector<Sophus::SE3> getCumPose();
 };

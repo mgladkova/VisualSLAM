@@ -1,54 +1,40 @@
-#include <Eigen/Core>
-#include <Eigen/Dense>
-#include <sophus/se3.hpp>     //2
-#include <opencv2/ximgproc/disparity_filter.hpp>
-#include <pangolin/pangolin.h>
-
-#include <opencv2/opencv.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/xfeatures2d.hpp>
-#include <opencv2/stereo.hpp>
-#include <opencv2/core/eigen.hpp>
-
-#include <string>
+#include <iostream>
 #include <vector>
-#include <unistd.h>
+// opencv
+#include <opencv2/core/core.hpp>
+#include <opencv/cv.hpp>
+#include <opencv2/stereo.hpp>
+#include <opencv2/ximgproc/disparity_filter.hpp>
+//#include <opencv/cxeigen.hpp>
+#include <sophus/so3.h>
+#include <opencv2/core/eigen.hpp>
+// eigen
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+//sophus
+#include <sophus/se3.h>
 
-struct KeyFrame {
-	cv::Mat image;
-    cv::Mat disparity_map;
-    std::vector<cv::KeyPoint> keypoints;
-	cv::Mat descriptor;
-};
+class VisualOdometry{
+private:
+//    std::vector<unsigned char> status;
+    float baseline = 0.53716;
+    cv::Mat disparityMap;
+//    std::vector<Sophus::SE3> historyPose;
+public:
+    VisualOdometry() {};
 
-class VisualOdometry {
-	private:
-        KeyFrame refFrame;
-        Sophus::SE3d pose;
+    //TO DO harrisDection
+    //TO DO featureTracking
+    std::vector<uchar> corr2DPointsFromPreFrame2DPoints(cv::Mat previousImage, cv::Mat currImage,
+                                                                std::vector<cv::Point2f>& previousFrame2DPoints,
+                                                                std::vector<cv::Point2f>& currFrame2DPoints);
+    //TO DO getDisparityMap
+    cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);
+    void generateDisparityMap(const cv::Mat image_left, const cv::Mat image_right);
+    //TO DO getDepth  currFrame2DPoints
+    std::vector<cv::Point3f> getDepth3DPointsFromCurrImage(std::vector<cv::Point2f>& currFrame2DPoints,Eigen::Matrix3d K);
 
-	public:
-		VisualOdometry();
-        void setReferenceFrame(const cv::Mat image, const cv::Mat disparity, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptor);
-        KeyFrame getReferenceFrame() const;
-
-        void setPose(const Sophus::SE3d pose);
-        Sophus::SE3d getPose() const;
-
-        cv::Mat getDisparityMap(const cv::Mat image_left, const cv::Mat image_right);
-        cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);
-
-        void extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new);
-        std::vector<cv::DMatch> findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypoints_new, cv::Mat descriptors_new);
-
-        void get3D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point3d>& p3d, std::vector<cv::Point2d>& p2d,
-                                    cv::Mat disparity_map, Eigen::Matrix3d K);
-        void get2D2DCorrespondences(std::vector<cv::KeyPoint> keypoints_new, std::vector<cv::DMatch> matches, std::vector<cv::Point2d>& p2d_1, std::vector<cv::Point2d>& p2d_2);
-
-        std::vector<int> estimatePose3D2D(std::vector<cv::Point3d> p3d, std::vector<cv::Point2d> p2d, Eigen::Matrix3d K);
-        void estimatePose2D2D(std::vector<cv::Point2d> p2d_1, std::vector<cv::Point2d> p2d_2, Eigen::Matrix3d K);
-
-        void trackFeatures();
-        void computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity, const float baseline, Eigen::Matrix3d K);
+    //TO DO poseEstimate2D3DPnp
+    Sophus::SE3 poseEstimate2D3DPNP(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d,Eigen::Matrix3d K);
 
 };
