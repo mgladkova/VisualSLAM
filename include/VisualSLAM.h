@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BundleAdjuster.h"
 #include "VisualOdometry.h"
 
