@@ -56,7 +56,7 @@ int main(int argc, char** argv){
     pangolin::View &d_cam = pangolin::CreateDisplay()
             .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f / 768.0f)
             .SetHandler(new pangolin::Handler3D(s_cam));
-#endif
+    
     float sz = 0.7;
     int width = 640, height = 480;
     Eigen::Matrix3d K = slam.getCameraMatrix();
@@ -64,6 +64,7 @@ int main(int argc, char** argv){
     float fy = K(1,1);
     float cx = K(0,2);
     float cy = K(1,2);
+#endif
 
     int k = 1;
 
@@ -102,7 +103,8 @@ int main(int argc, char** argv){
                 plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, cumR, pose);
             } else {
                 std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
-                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], cumR, pose);
+                Sophus::SE3d prevCumPose = slam.getPose(i-1);
+                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], cumR, cumPose, prevCumPose);
             }
         }
 #endif
@@ -152,7 +154,7 @@ int main(int argc, char** argv){
         usleep(5000);
 #endif
     }
-#ifdef VIS_POSES
+#ifdef OBSOLETE
     visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
 #endif
     cv::imwrite("result_trajectories.png", window);
