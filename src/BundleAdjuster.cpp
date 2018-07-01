@@ -87,13 +87,13 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = false;
-    options.max_num_iterations = 200;
-    options.function_tolerance = 1e-5;
-    options.dense_linear_algebra_library_type = ceres::LAPACK;
+    options.max_num_iterations = 100;
+    options.function_tolerance = 7e-5;
+    //options.dense_linear_algebra_library_type = ceres::LAPACK;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    std::cout << summary.BriefReport() << "\n";
+    std::cout << summary.FullReport() << "\n";
 
     Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
     map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);

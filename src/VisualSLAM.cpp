@@ -32,6 +32,10 @@ std::vector<cv::Point3f> VisualSLAM::getStructure3D() const{
     return map.getStructure3D();
 }
 
+bool VisualSLAM::checkPoint2DCoordinates(cv::Point2f point, cv::Mat image){
+    return point.x >= 0 && point.x < image.cols && point.y < image.rows && point.y >= 0;
+}
+
 void VisualSLAM::readCameraIntrisics(std::string camera_file_path){
 	std::ifstream file;
 	file.open(camera_file_path, std::ifstream::in);
@@ -160,7 +164,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
         return pose;
     }
 
-    int thresholdNumberFeatures = 200;
+    int thresholdNumberFeatures = 100;
     bool init = false;
 
     std::vector<uchar> status = VO.trackFeatures(prevImageLeft, image_left, pointsPreviousFrame, pointsCurrentFrame, thresholdNumberFeatures, init);
@@ -168,10 +172,11 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     std::vector<int> indices;
 
     for (int i = 0; i < status.size(); i++){
-        if (status[i]){
+        if (status[i] && checkPoint2DCoordinates(pointsCurrentFrame[i], image_left)){
             trackedPrevFramePoints.push_back(pointsPreviousFrame[i]);
             trackedCurrFramePoints.push_back(pointsCurrentFrame[i]);
             indices.push_back(i);
+            //std::cout << "Point at: " << pointsCurrentFrame[i].x << " " << pointsCurrentFrame[i].y << std::endl;
         }
     }
 
@@ -183,7 +188,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
 
     map.updateCumulativePose(pose);
 
-    int keyFrameStep = 5;
+    int keyFrameStep = 3;
     int numKeyFrames = 10;
 
     if (init){

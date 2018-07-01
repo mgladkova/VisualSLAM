@@ -148,11 +148,12 @@ std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2
 
     cv::Mat mask = disparity_map > 0;
 
-    double minPosValue;
+    double minPosValue = 0.1;
     cv::minMaxLoc(disparity_map, &minPosValue, NULL, NULL, NULL, mask);
 
     for (int i = 0; i < points2D.size(); i++) {
         cv::Point2f p = points2D[i];
+        //std::cout << p.x << " " << p.y << std::endl;
         float disparity = disparity_map.at<float>(p.y, p.x);
         if (disparity < 0.1){
             // compute the average depth over the path around the point
@@ -276,6 +277,7 @@ std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const 
     std::vector<float> err;
 
     cv::calcOpticalFlowPyrLK(prevFrame, currFrame, prevFramePoints, currFramePoints, status, err, winSize, 3, termcrit, 0, 0.001);
+
     int numTracked = 0;
     for (int i = 0; i < status.size(); i++){
         if (status[i]){
@@ -284,6 +286,7 @@ std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const 
     }
 
     std::cout << "Tracked size: " << numTracked << " / " << status.size() << std::endl;
+    std::cout << prevFramePoints.size() << " " << currFramePoints.size() << std::endl;
 
     if (numTracked < thresholdNumberFeatures){
         initialize = true;

@@ -29,4 +29,6 @@ public:
     void readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData);
     Sophus::SE3d performFrontEndStep(cv::Mat image_left, cv::Mat image_right, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame); // feature detection / tracking and matching
     Sophus::SE3d performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat image_right, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPrevFrame, cv::Mat& prevImageLeft);
+
+    bool checkPoint2DCoordinates(cv::Point2f point, cv::Mat image);
 };
