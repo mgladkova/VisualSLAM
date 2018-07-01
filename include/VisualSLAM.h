@@ -24,6 +24,7 @@ public:
     double getFocalLength() const;
 
     std::vector<cv::Point3f> getStructure3D() const;
+    std::vector<std::pair<int, cv::Point2f>> getObservationsForCamera(int cameraIndex);
 
 	void readCameraIntrisics(std::string camera_intrinsics_file);
     void readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData);

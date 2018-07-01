@@ -32,6 +32,16 @@ std::vector<cv::Point3f> VisualSLAM::getStructure3D() const{
     return map.getStructure3D();
 }
 
+std::vector<std::pair<int, cv::Point2f>> VisualSLAM::getObservationsForCamera(int cameraIndex){
+    std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = map.getObservations();
+
+    if (cameraIndex >= observations.size() || cameraIndex < 0){
+        throw std::runtime_error("getObservationsForCamera() : Index out of bounds!");
+    }
+
+    return observations[cameraIndex];
+}
+
 bool VisualSLAM::checkPoint2DCoordinates(cv::Point2f point, cv::Mat image){
     return point.x >= 0 && point.x < image.cols && point.y < image.rows && point.y >= 0;
 }

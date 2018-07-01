@@ -17,8 +17,10 @@ public:
     bool isStopped();
     bool isFinished();
 
-    void drawPose();
+    void drawPose(int cameraIndex);
     void draw3DStructure();
+
+    void drawConnections(int cameraIndex);
 
 private:
     VisualSLAM* mSlam;
