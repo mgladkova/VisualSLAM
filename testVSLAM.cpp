@@ -25,7 +25,7 @@ int main(int argc, char const *argv[]){
         throw std::runtime_error("The number of images is smaller than 0 ");
     }
 
-    std::vector<Sophus::SE3> groundTruthPoses;
+    std::vector<Sophus::SE3d> groundTruthPoses;
 
     if (argc >= 6){
         std::string ground_truth_path = argv[5];
@@ -70,25 +70,27 @@ int main(int argc, char const *argv[]){
         if(rightImage.cols <= 0 || rightImage.rows <= 0){
             throw std::runtime_error("can not read rightImage and its path is : "+ right_image_name);
         }
-        Sophus::SE3 estimatedPose;
-        estimatedPose = slam.estimate3D2DFrontEndWithOpicalFlow(leftImage, rightImage, previousFrame2DPoints, currFrame2DPoints, previousImage);
+        Sophus::SE3d estimatedPose;
+        Sophus::SE3d prePose;
+        estimatedPose = slam.estimate3D2DFrontEndWithOpicalFlow(leftImage, rightImage, previousFrame2DPoints, currFrame2DPoints, previousImage,prePose);
 
+        prePose = estimatedPose;
 
 
         //visualization
-        Sophus::SE3 cumPose;
+        Sophus::SE3d cumPose;
         if (i != 0){
             cumPose = slam.getPose(i);
         }
         std::cout<<"pose "<< i << std::endl<<cumPose.matrix()<<std::endl;
         if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
             if (i == 0){
-                Sophus::SE3 groundTruthPrevPose = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
+                Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
                 slam.plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, cumR, estimatedPose);
             }
             else {
                 std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
-                Sophus::SE3 prevCumPose = slam.getPose(i-1);
+                Sophus::SE3d prevCumPose = slam.getPose(i-1);
                 slam.plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], cumR, cumPose, prevCumPose);
             }
         }

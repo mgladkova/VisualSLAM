@@ -12,14 +12,16 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 //sophus
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 class VisualOdometry{
 private:
 //    std::vector<unsigned char> status;
     float baseline = 0.53716;
     cv::Mat disparityMap;
-//    std::vector<Sophus::SE3> historyPose;
+//    std::vector<Sophus::SE3d> historyPose;
+    bool reInitial;
+    int thresholdFeactures=100;
 public:
     VisualOdometry() {};
 
@@ -35,6 +37,8 @@ public:
     std::vector<cv::Point3f> getDepth3DPointsFromCurrImage(std::vector<cv::Point2f>& currFrame2DPoints,Eigen::Matrix3d K);
 
     //TO DO poseEstimate2D3DPnp
-    Sophus::SE3 poseEstimate2D3DPNP(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d,Eigen::Matrix3d K);
+    Sophus::SE3d poseEstimate2D3DPNP(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d,Eigen::Matrix3d K,Sophus::SE3d prePose);
 
+    //TO DO getReIntial
+    bool getReInital();
 };

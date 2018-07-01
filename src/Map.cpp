@@ -12,7 +12,7 @@ int Map::getValue() {
     return test_a;
 }
 
-void Map::updateCumPose(Sophus::SE3 newPose) {
+void Map::updateCumPose(Sophus::SE3d newPose) {
 
     if (cumPose.empty()){
         cumPose.push_back(newPose);
@@ -26,6 +26,6 @@ void Map::updatePoseIndex() {
     poseIndex = poseIndex + 1 ;
 }
 
-std::vector<Sophus::SE3> Map::getCumPose() {
+std::vector<Sophus::SE3d> Map::getCumPose() {
     return cumPose;
 }

@@ -18,8 +18,22 @@ std::vector<uchar> VisualOdometry::corr2DPointsFromPreFrame2DPoints(cv::Mat prev
     // trackedCurrFrame2DPoints
 
 //    std::cout<<" trackedCurrFrame2DPoints size "<<trackedCurrFrame2DPoints.size() << std::endl;
+    int numTrackedFeactures(0);
+    for (int i = 0; i < status.size() ; ++i) {
+        if (status[i] == 1){
+            numTrackedFeactures ++;
+        }
+    }
+    if (numTrackedFeactures < thresholdFeactures){
+        reInitial = true ;
+    }
+
 
     return status;
+}
+
+bool VisualOdometry::getReInital() {
+    return reInitial ;
 }
 
 cv::Rect VisualOdometry::computeROIDisparityMap(cv::Size2i src_sz,
@@ -134,7 +148,7 @@ std::vector<cv::Point3f> VisualOdometry::getDepth3DPointsFromCurrImage(std::vect
 
 
 //TO DO poseEstimate2D3DPnp
-Sophus::SE3 VisualOdometry::poseEstimate2D3DPNP(std::vector<cv::Point3f> &p3d, std::vector<cv::Point2f> &p2d,Eigen::Matrix3d K) {
+Sophus::SE3d VisualOdometry::poseEstimate2D3DPNP(std::vector<cv::Point3f> &p3d, std::vector<cv::Point2f> &p2d,Eigen::Matrix3d K,Sophus::SE3d prePose ) {
 
     Eigen::Matrix3d R21;
     Eigen::Vector3d t21;
@@ -153,15 +167,15 @@ Sophus::SE3 VisualOdometry::poseEstimate2D3DPNP(std::vector<cv::Point3f> &p3d, s
         cv::cv2eigen(translationVector,t21);
     }
 
-    Sophus::SE3 posePnp(R21,t21);
+    Sophus::SE3d posePnp(R21,t21);
 //    std::cout<<"pose inverse: "<<std::endl<<posePnp.inverse().matrix()<<std::endl;
 //    historyPose.push_back(posePnp.inverse());
 
     std::cout<<"pose norm: "<<std::endl<<posePnp.log().norm() <<std::endl;
-//    int MAXPoseNorm = 1;
-//    if (posePnp.log().norm() > MAXPoseNorm){
-//        posePnp = prevPose;
-//    }
+    int MAXPoseNorm = 1;
+    if (posePnp.log().norm() > MAXPoseNorm){
+        posePnp = prePose;
+    }
 
     return posePnp;
 
@@ -170,12 +184,12 @@ Sophus::SE3 VisualOdometry::poseEstimate2D3DPNP(std::vector<cv::Point3f> &p3d, s
 
 //// visualization
 //void VisualOdometry::plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated,
-//                                            Sophus::SE3 groundTruthPose, Sophus::SE3 groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3 estimPose,  Sophus::SE3 estimPrevPose){
+//                                            Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3d estimPose,  Sophus::SE3d estimPrevPose){
 //    int offsetX = 300;
 //    int offsetY = 300;
 //
-//    Sophus::SE3 pose = estimPose.inverse();
-//    Sophus::SE3 prevPose = estimPrevPose.inverse();
+//    Sophus::SE3d pose = estimPose.inverse();
+//    Sophus::SE3d prevPose = estimPrevPose.inverse();
 //
 //    if (index == 0){
 //        translGTAccumulated = groundTruthPose.translation();
