@@ -164,35 +164,35 @@ Sophus::SE3d VisualSLAM::estimate3D2DFrontEndWithOpicalFlow(cv::Mat leftImage_, 
     map.updatePoseIndex();
     map.updateCumPose(pose);
 
-    //TO DO reInitial
-    if (VO.getReInital()){
-        //TO DO Harris Detection
-        std::cout << "re-initial " << std::endl;
-        cv::goodFeaturesToTrack(leftImage,currFrame2DPoints,maxCorners,0.01,10,cv::Mat(),3,3,false,0.04);
-        cv::cornerSubPix(leftImage,currFrame2DPoints,subPixel,cv::Size(-1,-1),termcrit);
-        std::cout << "step1 check feature size " << currFrame2DPoints.size() << std::endl;
+//     //TO DO reInitial
+//     if (VO.getReInital()){
+//         //TO DO Harris Detection
+//         std::cout << "re-initial " << std::endl;
+//         cv::goodFeaturesToTrack(leftImage,currFrame2DPoints,maxCorners,0.01,10,cv::Mat(),3,3,false,0.04);
+//         cv::cornerSubPix(leftImage,currFrame2DPoints,subPixel,cv::Size(-1,-1),termcrit);
+//         std::cout << "step1 check feature size " << currFrame2DPoints.size() << std::endl;
 
-        //TO DO getDisparityMapFromCurrImage
-        std::vector<cv::Point3f> p3d;
-        VO.generateDisparityMap(leftImage,rightImage);
-        p3d = VO.getDepth3DPointsFromCurrImage(currFrame2DPoints,K);
-        int maxDistance = 150 ;
-        for (int i = 0; i <p3d.size() ; ++i) {
-            if (p3d[i].z > maxDistance ){
-//                std::cout<<"depth "<<p3d[i]<<std::endl;
-                p3d.erase(p3d.begin()+i);
-                currFrame2DPoints.erase(currFrame2DPoints.begin()+i);
-            }
-            else if (std::isnan(p3d[i].z)){
-                p3d.erase(p3d.begin()+i);
-                currFrame2DPoints.erase(currFrame2DPoints.begin()+i);
-            }
-        }
-        std::cout<<" re-initial p3d size "<<p3d.size()<<"  re-initial currFrame2DPoints size"<<currFrame2DPoints.size()<<std::endl;
-//        std::cout << "step 2 check feature size after erase " << currFrame2DPoints.size() << std::endl;
+//         //TO DO getDisparityMapFromCurrImage
+//         std::vector<cv::Point3f> p3d;
+//         VO.generateDisparityMap(leftImage,rightImage);
+//         p3d = VO.getDepth3DPointsFromCurrImage(currFrame2DPoints,K);
+//         int maxDistance = 150 ;
+//         for (int i = 0; i <p3d.size() ; ++i) {
+//             if (p3d[i].z > maxDistance ){
+// //                std::cout<<"depth "<<p3d[i]<<std::endl;
+//                 p3d.erase(p3d.begin()+i);
+//                 currFrame2DPoints.erase(currFrame2DPoints.begin()+i);
+//             }
+//             else if (std::isnan(p3d[i].z)){
+//                 p3d.erase(p3d.begin()+i);
+//                 currFrame2DPoints.erase(currFrame2DPoints.begin()+i);
+//             }
+//         }
+//         std::cout<<" re-initial p3d size "<<p3d.size()<<"  re-initial currFrame2DPoints size"<<currFrame2DPoints.size()<<std::endl;
+// //        std::cout << "step 2 check feature size after erase " << currFrame2DPoints.size() << std::endl;
 
-        return pose;
-    }
+//         return pose;
+//     }
 
 
     previousFrame2DPoints.clear();
