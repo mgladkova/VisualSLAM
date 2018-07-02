@@ -1,5 +1,5 @@
 // * Class BundleAdjuster is responsible for optimizations of 3D structure and camera pose
-
+#pragma once
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
