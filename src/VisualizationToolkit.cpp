@@ -32,7 +32,7 @@ void plot2DPoints(cv::Mat image, std::vector<cv::KeyPoint> keypoints){
 void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated,
                             Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3d estimPose,  Sophus::SE3d estimPrevPose){
     int offsetX = 300;
-    int offsetY = 300;
+    int offsetY = 500;
 
     Sophus::SE3d pose = estimPose.inverse();
     Sophus::SE3d prevPose = estimPrevPose.inverse();
@@ -42,10 +42,10 @@ void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translG
         translEstimAccumulated = pose.translation();
     } else {
         translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
-        translEstimAccumulated = translGTAccumulated + (pose.so3().inverse()*prevPose.so3())*(pose.translation() - prevPose.translation());
+        translEstimAccumulated = translEstimAccumulated + (pose.so3().inverse()*prevPose.so3())*(pose.translation() - prevPose.translation());
     }
-    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY + translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY + translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
+    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY - translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
+    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY - translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
     cv::imshow("Trajectory", window);
     cv::waitKey(3);
     cumR = cumR*pose.so3().matrix();
