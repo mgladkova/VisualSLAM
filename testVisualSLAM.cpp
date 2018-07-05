@@ -27,7 +27,7 @@ int main(int argc, char** argv){
     VisualSLAM slam;
     slam.readCameraIntrisics(camera_intrinsics_path);
     Eigen::Vector3d translGTAccumulated, translEstimAccumulated(1,1,1);
-    std::vector<Sophus::SE3d> groundTruthPoses;
+    std::vector<Sophus::SE3> groundTruthPoses;
 
     if (argc >= 6){
         std::string ground_truth_path = argv[5];
@@ -41,8 +41,8 @@ int main(int argc, char** argv){
     cv::Mat descriptors;
     Eigen::Matrix3d cumR = Eigen::Matrix3d::Identity();
 
-    Viewer* viewer = new Viewer(slam);
-    std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
+//    Viewer* viewer = new Viewer(slam);
+//    std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
 
     int k = 1;
 
@@ -67,21 +67,21 @@ int main(int argc, char** argv){
         if (image_right.cols == 0 || image_right.rows == 0){
             throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
         }
-        Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
+        Sophus::SE3 pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
         plot2DPoints(image_left, pointsCurrentFrame);
 
-        Sophus::SE3d cumPose;
+        Sophus::SE3 cumPose;
         if (i != 0){
             cumPose = slam.getPose(i);
         }
 #ifdef VIS_TRAJECTORY
         if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
             if (i == 0){
-                Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
+                Sophus::SE3 groundTruthPrevPose = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
                 plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPrevPose, cumR, pose);
             } else {
                 std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
-                Sophus::SE3d prevCumPose = slam.getPose(i-1);
+                Sophus::SE3 prevCumPose = slam.getPose(i-1);
                 plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulated, groundTruthPoses[i], groundTruthPoses[i-1], cumR, cumPose, prevCumPose);
             }
         }
@@ -91,8 +91,8 @@ int main(int argc, char** argv){
     visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
 #endif
 
-    viewerThread->join();
-    delete viewer;
+//    viewerThread->join();
+//    delete viewer;
 
     cv::imwrite("result_trajectories.png", window);
     return 0;
