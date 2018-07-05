@@ -17,11 +17,11 @@ KeyFrame VisualOdometry::getReferenceFrame() const {
     return refFrame;
 }
 
-void VisualOdometry::setPose(const Sophus::SE3d pose){
+void VisualOdometry::setPose(const Sophus::SE3 pose){
     this->pose = pose;
 }
 
-Sophus::SE3d VisualOdometry::getPose() const{
+Sophus::SE3 VisualOdometry::getPose() const{
     return pose;
 }
 
@@ -207,7 +207,7 @@ void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsP
     }
 }
 
-void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose){
+void VisualOdometry::estimatePoSE32D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3& pose){
     cv::Mat cameraMatrix;
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
     cv::Mat rvec,tvec,rot_matrix;
@@ -240,7 +240,7 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector
     std::swap(p3d, p3d_filtered);
     std::swap(p2d, p2d_filtered);
 
-    Sophus::SE3d newPose = Sophus::SE3d(R, t);
+    Sophus::SE3 newPose = Sophus::SE3(R, t);
 
     int MAX_POSE_NORM = 100;
     if (newPose.log().norm() <= MAX_POSE_NORM){
@@ -248,7 +248,7 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector
     }
 }
 
-void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3d& pose){
+void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3& pose){
     cv::Mat tvec,rot_matrix;
     cv::Mat cameraMatrix;
     Eigen::Matrix3d R;
@@ -265,7 +265,7 @@ void VisualOdometry::estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vecto
     cv::cv2eigen(rot_matrix, R);
     cv::cv2eigen(tvec,t);
 
-    pose = Sophus::SE3d(R, t);
+    pose = Sophus::SE3(R, t);
 }
 
 std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& prevFramePoints, std::vector<cv::Point2f>& currFramePoints,

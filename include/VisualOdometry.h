@@ -2,7 +2,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <sophus/se3.hpp>
+#include <sophus/se3.h>
 #include <opencv2/ximgproc/disparity_filter.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -25,15 +25,15 @@ struct KeyFrame {
 class VisualOdometry {
 	private:
         KeyFrame refFrame;
-        Sophus::SE3d pose;
+        Sophus::SE3 pose;
 
 	public:
 		VisualOdometry();
         void setReferenceFrame(const cv::Mat image, const cv::Mat disparity_map, const std::vector<cv::KeyPoint> keypoints, const cv::Mat descriptors);
         KeyFrame getReferenceFrame() const;
 
-        void setPose(const Sophus::SE3d pose);
-        Sophus::SE3d getPose() const;
+        void setPose(const Sophus::SE3 pose);
+        Sophus::SE3 getPose() const;
 
         void setKeyFrameKeypoints(std::vector<cv::KeyPoint> updatedKeypoints);
         std::vector<cv::Point2d> get2DPointsKeyFrame();
@@ -51,8 +51,8 @@ class VisualOdometry {
 
         void get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsPrevFrame, std::vector<cv::KeyPoint> keypointsCurrentFrame, std::vector<cv::DMatch> matches, std::vector<cv::Point2f>& p2dPrevFrame, std::vector<cv::Point2f>& p2dCurrentFrame);
 
-        void estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose);
-        void estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3d& pose);
+        void estimatePoSE32D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3& pose);
+        void estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3& pose);
 
         std::vector<uchar> trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& currFramePoints, std::vector<cv::Point2f>& prevFramePoints,
                            const int thresholdNumberFeatures, bool& initialize);

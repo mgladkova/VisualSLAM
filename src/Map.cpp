@@ -7,7 +7,7 @@ Map::Map() {
 
 void Map::addPoints3D(std::vector<cv::Point3f> points3D){
     // convert points from camera to world coordinate system
-    Sophus::SE3d cumPose = cumPoses[currentCameraIndex];
+    Sophus::SE3 cumPose = cumPoses[currentCameraIndex];
 
     for (int i = 0; i < points3D.size(); i++){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
@@ -33,7 +33,7 @@ void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> obs
     observations[currentCameraIndex] = newObservations;
 }
 
-void Map::updateCumulativePose(Sophus::SE3d newTransform){
+void Map::updateCumulativePose(Sophus::SE3 newTransform){
     if (cumPoses.empty()){
         cumPoses.push_back(newTransform);
         return;
@@ -56,11 +56,11 @@ std::map<int, std::vector<std::pair<int, cv::Point2f>>> Map::getObservations() c
     return observations;
 }
 
-std::vector<Sophus::SE3d> Map::getCumPoses() const{
+std::vector<Sophus::SE3> Map::getCumPoses() const{
     return cumPoses;
 }
 
-Sophus::SE3d Map::getCumPoseAt(int index) const{
+Sophus::SE3 Map::getCumPoseAt(int index) const{
     if (index < 0 || index > cumPoses.size()){
         throw std::runtime_error("getCumPoseAt() : Index out of bounds!");
     }
@@ -68,7 +68,7 @@ Sophus::SE3d Map::getCumPoseAt(int index) const{
     return cumPoses[index];
 }
 
-void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
+void Map::setCameraPose(const int i, const Sophus::SE3 newPose){
     if (i < 0 || i >= cumPoses.size()){
         throw std::runtime_error("setCameraPose() : Index is out of bounds!");
     }
@@ -76,7 +76,7 @@ void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
     cumPoses[i].translation() = newPose.translation();
 }
 
-void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera){
+void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3 firstCamera){
     if (uniquePointIndices.empty()){
         throw std::runtime_error("updatePoints3D() : No point indices are given");
     }
@@ -87,13 +87,24 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
         }
         Eigen::Vector3d v(points3DArray[3*i], points3DArray[3*i + 1], points3DArray[3*i + 2]);
         //v = firstCamera*v;
+//        std::cout<< "before BA 3D Points: "<< structure3D[i] <<std::endl;
         structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
+//        std::cout<< "after BA  3D Points: "<< structure3D[i] <<std::endl;
     }
 }
 
 void Map::updateCameraIndex(){
     currentCameraIndex = currentCameraIndex + 1;
 }
+
+
+void Map::printCumPose() {
+
+    for (int i = 0; i < cumPoses.size(); i++) {
+        std::cout << "cumPose:  " << i << std::endl << cumPoses[i].matrix() << std::endl;
+    }
+}
+
 
 void Map::writeBAFile(std::string fileName, int keyFrameStep, int numKeyFrames) {
     std::ofstream file;

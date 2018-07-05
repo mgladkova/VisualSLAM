@@ -9,12 +9,12 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
         throw std::runtime_error("prepareDataForBA() : No structure data is stored!");
     }
 
-    std::vector<Sophus::SE3d> cameraCumPoses = map.getCumPoses();
+    std::vector<Sophus::SE3> cameraCumPoses = map.getCumPoses();
 
-    Sophus::SE3d firstCameraCumPose = cameraCumPoses[startFrame];
+    Sophus::SE3 firstCameraCumPose = cameraCumPoses[startFrame];
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
-        Sophus::SE3d cameraPose = cameraCumPoses[i];
+        Sophus::SE3 cameraPose = cameraCumPoses[i];
 
         Eigen::Matrix3d rotation = cameraPose.so3().matrix();
         Eigen::Vector3d t = cameraPose.translation();
@@ -46,7 +46,7 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
     }
 }
 
-void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames){
+std::vector<Sophus::SE3> BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames){
     int currentCameraIndex = map.getCurrentCameraIndex();
     int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
 
@@ -95,17 +95,21 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
 
-    Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
+    Sophus::SE3 firstFrame = map.getCumPoseAt(startFrame);
     map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
 
+    std::vector<Sophus::SE3> newPoseVector;
     for (int i = startFrame; i < currentCameraIndex; i+=keyFrameStep){
         int cameraIndex = (i - startFrame) / keyFrameStep;
         Eigen::Quaterniond q(cameraPose[7*cameraIndex], cameraPose[7*cameraIndex + 1], cameraPose[7*cameraIndex + 2], cameraPose[7*cameraIndex + 3]);
         Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
 
-        Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
+        Sophus::SE3 newPose(q.normalized().toRotationMatrix(), t);
         std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
         std::cout << "New pose " << i << " : " << newPose.matrix() << std::endl;
-        map.setCameraPose(i, newPose);
+//        map.setCameraPose(i, newPose);
+        newPoseVector.push_back(newPose);
     }
+
+    return  newPoseVector;
 }

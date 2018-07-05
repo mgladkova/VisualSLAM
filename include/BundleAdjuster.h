@@ -4,7 +4,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <sophus/se3.hpp>
+#include <sophus/se3.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
@@ -79,6 +79,8 @@ public:
 class BundleAdjuster {
 public:
         BundleAdjuster();
-        void optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames);
+        std::vector<Sophus::SE3> optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames);
         void prepareDataForBA(Map map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* cameraPose);
+        int getStartFrame();
+        int getcurrentCameraIndex();
 };

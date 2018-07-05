@@ -88,12 +88,12 @@ void computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity,
 }
 
 void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated, Eigen::Vector3d& translEstimAccumulated,
-                            Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3d estimPose,  Sophus::SE3d estimPrevPose){
+                            Sophus::SE3 groundTruthPose, Sophus::SE3 groundTruthPrevPose, Eigen::Matrix3d& cumR, Sophus::SE3 estimPose,  Sophus::SE3 estimPrevPose){
     int offsetX = 200;
     int offsetY = 500;
 
-    Sophus::SE3d pose = estimPose.inverse();
-    Sophus::SE3d prevPose = estimPrevPose.inverse();
+    Sophus::SE3 pose = estimPose.inverse();
+    Sophus::SE3 prevPose = estimPrevPose.inverse();
 
     if (index == 0){
         translGTAccumulated = groundTruthPose.translation();
@@ -102,16 +102,16 @@ void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translG
         translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
         translEstimAccumulated = translEstimAccumulated + (pose.so3().inverse()*prevPose.so3())*(pose.translation() - prevPose.translation());
     }
-    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[2], offsetX + translGTAccumulated[1]), 3, cv::Scalar(0,0,255), -1);
-    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[2], offsetY + translEstimAccumulated[1]), 3, cv::Scalar(0,255,0), -1);
-    //cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY - translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-    //cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY - translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
+    //cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[2], offsetX + translGTAccumulated[1]), 3, cv::Scalar(0,0,255), -1);
+    //cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[2], offsetY + translEstimAccumulated[1]), 3, cv::Scalar(0,255,0), -1);
+    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY - translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
+    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY - translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
     cv::imshow("Trajectory", window);
     cv::waitKey(3);
     cumR = cumR*pose.so3().matrix();
 }
 
-void visualizeAllPoses(std::vector<Sophus::SE3d> historyPoses, Eigen::Matrix3d K){
+void visualizeAllPoses(std::vector<Sophus::SE3> historyPoses, Eigen::Matrix3d K){
     // create pangolin window and plot the trajectory
     pangolin::CreateWindowAndBind("VisualSLAM Viewer", 1024, 768);
     glEnable(GL_DEPTH_TEST);
