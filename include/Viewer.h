@@ -1,8 +1,4 @@
 #include "VisualSLAM.h"
-#include <mutex>
-#include <thread>
-#include <chrono>
-
 #pragma once
 
 class Viewer {
@@ -10,9 +6,10 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
     Viewer(VisualSLAM& slam);
-    void run();
+    void run(int numFrames);
     void stop();
     void finish();
+    void resume();
 
     bool isStopped();
     bool isFinished();

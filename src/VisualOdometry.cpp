@@ -207,7 +207,7 @@ void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsP
     }
 }
 
-void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose){
+void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d_PrevFrame, std::vector<cv::Point2f>& p2d_CurrentFrame, std::vector<int>& indices, Eigen::Matrix3d K, Sophus::SE3d& pose){
     cv::Mat cameraMatrix;
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
     cv::Mat rvec,tvec,rot_matrix;
@@ -216,7 +216,7 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector
     cv::eigen2cv(K, cameraMatrix);
 
     std::vector<int> inliers;
-    bool result=cv::solvePnPRansac(p3d,p2d,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 4.0, 0.99, inliers);
+    bool result=cv::solvePnPRansac(p3d,p2d_PrevFrame,cameraMatrix, distCoeffs,rvec,tvec, false, 200, 3.0, 0.99, inliers);
 
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
@@ -226,19 +226,31 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector
 
     std::sort(inliers.begin(), inliers.end());
 
-    std::vector<cv::Point2f> p2d_filtered;
+    std::vector<cv::Point2f> p2d_PrevFrame_filtered, p2d_CurrentFrame_filtered;
     std::vector<cv::Point3f> p3d_filtered;
+    std::vector<int> indices_filtered;
 
     for (int i = 0; i < inliers.size(); i++){
         std::vector<cv::Point3f>::iterator it_3D = p3d.begin() + inliers[i];
-        std::vector<cv::Point2f>::iterator it_2D = p2d.begin() + inliers[i];
+        std::vector<cv::Point2f>::iterator it_2D_Prev = p2d_PrevFrame.begin() + inliers[i];
+        std::vector<cv::Point2f>::iterator it_2D_Curr = p2d_CurrentFrame.begin() + inliers[i];
+        if (!indices.empty()){
+            std::vector<int>::iterator it_2D_indices = indices.begin() + inliers[i];
+            indices_filtered.push_back(*it_2D_indices);
+        } else {
+            indices_filtered = inliers;
+        }
 
         p3d_filtered.push_back(*it_3D);
-        p2d_filtered.push_back(*it_2D);
+        p2d_PrevFrame_filtered.push_back(*it_2D_Prev);
+        p2d_CurrentFrame_filtered.push_back(*it_2D_Curr);
+
     }
 
     std::swap(p3d, p3d_filtered);
-    std::swap(p2d, p2d_filtered);
+    std::swap(p2d_CurrentFrame, p2d_CurrentFrame_filtered);
+    std::swap(indices, indices_filtered);
+    std::swap(p2d_PrevFrame, p2d_PrevFrame_filtered);
 
     Sophus::SE3d newPose = Sophus::SE3d(R, t);
 

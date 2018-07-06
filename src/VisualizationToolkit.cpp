@@ -102,10 +102,10 @@ void plotTrajectoryNextStep(cv::Mat& window, int index, Eigen::Vector3d& translG
         translGTAccumulated = translGTAccumulated + (groundTruthPose.so3().inverse()*groundTruthPrevPose.so3())*(groundTruthPose.translation() - groundTruthPrevPose.translation());
         translEstimAccumulated = translEstimAccumulated + (pose.so3().inverse()*prevPose.so3())*(pose.translation() - prevPose.translation());
     }
-    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[2], offsetX + translGTAccumulated[1]), 3, cv::Scalar(0,0,255), -1);
-    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[2], offsetY + translEstimAccumulated[1]), 3, cv::Scalar(0,255,0), -1);
-    //cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY - translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
-    //cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY - translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
+    //cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[2], offsetX + translGTAccumulated[1]), 3, cv::Scalar(0,0,255), -1);
+    //cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[2], offsetY + translEstimAccumulated[1]), 3, cv::Scalar(0,255,0), -1);
+    cv::circle(window, cv::Point2d(offsetX + translGTAccumulated[0], offsetY - translGTAccumulated[2]), 3, cv::Scalar(0,0,255), -1);
+    cv::circle(window, cv::Point2f(offsetX + translEstimAccumulated[0], offsetY - translEstimAccumulated[2]), 3, cv::Scalar(0,255,0), -1);
     cv::imshow("Trajectory", window);
     cv::waitKey(3);
     cumR = cumR*pose.so3().matrix();

@@ -12,6 +12,13 @@ Sophus::SE3d VisualSLAM::getPose(int index) {
     return map.getCumPoses().at(index);
 }
 
+Sophus::SE3d VisualSLAM::getGTPose(int index) const{
+    if (index < 0 || index >= groundTruthData.size()){
+        throw std::runtime_error("getGTPose() : Index out of bounds");
+    }
+    return groundTruthData[index];
+}
+
 std::vector<Sophus::SE3d> VisualSLAM::getPoses() const{
     return map.getCumPoses();
 }
@@ -101,6 +108,8 @@ void VisualSLAM::readGroundTruthData(std::string fileName, int numberFrames, std
         groundTruthData.push_back(newPose);
         i++;
     }
+
+    this->groundTruthData = groundTruthData;
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_right, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame){
@@ -126,7 +135,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_r
 
     std::vector<cv::Point3f> p3d_currFrame = VO.get3DCoordinates(p2d_currFrame, disparityCurrentFrame, K);
 
-    VO.estimatePose3D2D(p3d_currFrame, p2d_prevFrame, K, pose);
+    std::vector<int> indices;
+
+    VO.estimatePose3D2D(p3d_currFrame, p2d_prevFrame, p2d_currFrame, indices, K, pose);
 
     descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
 
@@ -137,7 +148,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat image_r
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat image_right, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImageLeft){
-    int max_features = 500;
+    int max_features = 550;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
     cv::Size subPixWinSize(10,10);
 
@@ -150,9 +161,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
 
         std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
 
-        int maxDistance = 150;
+        int maxDistance = 100;
         for (int i = 0; i < points3D.size(); i++){
-            if (points3D[i].z > maxDistance){
+            if (points3D[i].z > maxDistance || !checkPoint2DCoordinates(pointsCurrentFrame[i], disparity_map)){
                 points3D.erase(points3D.begin() + i);
                 pointsCurrentFrame.erase(pointsCurrentFrame.begin() + i);
             }
@@ -162,6 +173,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
         std::iota(indices.begin(), indices.end(), 0);
 
         map.addObservations(indices, pointsCurrentFrame, true);
+
         map.updateCumulativePose(pose);
         map.addPoints3D(points3D);
 
@@ -174,7 +186,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
         return pose;
     }
 
-    int thresholdNumberFeatures = 100;
+    int thresholdNumberFeatures = 150;
     bool init = false;
 
     std::vector<uchar> status = VO.trackFeatures(prevImageLeft, image_left, pointsPreviousFrame, pointsCurrentFrame, thresholdNumberFeatures, init);
@@ -191,15 +203,24 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     }
 
     std::vector<cv::Point3f> points3DCurrentFrame = VO.get3DCoordinates(trackedCurrFramePoints, disparity_map, K);
-    map.addObservations(indices, trackedCurrFramePoints, false);
+
+    for (int i = 0; i < points3DCurrentFrame.size(); i++){
+        if (points3DCurrentFrame[i].z < 0){
+            std::cout << "POINTS 3D: " << points3DCurrentFrame[i].x << " " << points3DCurrentFrame[i].y << " "
+                      << points3DCurrentFrame[i].z << std::endl;
+        }
+    }
 
     //VO.estimatePose2D2D(pointsPreviousFrame, pointsCurrentFrame, K, pose);
-    VO.estimatePose3D2D(points3DCurrentFrame, trackedPrevFramePoints, K, pose);
+    VO.estimatePose3D2D(points3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints,  indices, K, pose);
 
+    std::cout << "SIZES: " << indices.size() << " " << trackedCurrFramePoints.size() << std::endl;
+
+    map.addObservations(indices, trackedCurrFramePoints, false);
     map.updateCumulativePose(pose);
 
-    int keyFrameStep = 3;
-    int numKeyFrames = 10;
+    int keyFrameStep = 5;
+    int numKeyFrames = 5;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -209,9 +230,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
 
         std::vector<cv::Point3f> points3D = VO.get3DCoordinates(pointsCurrentFrame, disparity_map, K);
 
-        int maxDistance = 150;
+        int maxDistance = 100;
         for (int i = 0; i < points3D.size(); i++){
-            if (points3D[i].z > maxDistance){
+            if (points3D[i].z > maxDistance || !checkPoint2DCoordinates(pointsCurrentFrame[i], disparity_map)){
                 points3D.erase(points3D.begin() + i);
                 pointsCurrentFrame.erase(pointsCurrentFrame.begin() + i);
             }
@@ -227,8 +248,11 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image_left, cv:
     map.updateCameraIndex();
 
     if (map.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep) == 0 && map.getCurrentCameraIndex() > 0){
+    //int overlapBAPatches = std::max(1, int(keyFrameStep / 2));
+    //if ((map.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0 &&
+    //    (map.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) % overlapBAPatches == 0){
         std::string fileName = "BAFile" + std::to_string(map.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + ".txt";
-        map.writeBAFile(fileName, keyFrameStep, numKeyFrames);
+        //map.writeBAFile(fileName, keyFrameStep, numKeyFrames);
         BA.optimizeCameraPosesForKeyframes(map, keyFrameStep, numKeyFrames);
     }
 

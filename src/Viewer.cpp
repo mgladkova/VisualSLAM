@@ -7,10 +7,11 @@ Viewer::Viewer(VisualSLAM& slam){
 
 }
 
-void Viewer::run(){
-    mFinished = false;
-    mStopped = false;
+int i = 0;
 
+void Viewer::run(int numFrames){
+    mStopped = false;
+    mFinished = false;
     int w = 640, h = 480;
 
     pangolin::CreateWindowAndBind("VisualSLAM Viewer", 1024, 768);
@@ -27,8 +28,15 @@ void Viewer::run(){
             .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -w/(float)h)
             .SetHandler(new pangolin::Handler3D(Visualization3D_camera));
 
-    while(pangolin::ShouldQuit() == false){
-        int index = mSlam->getNumberPoses() - 1;
+    while(pangolin::ShouldQuit() == false && i < numFrames){
+        if(isStopped()){
+            while(isStopped()){
+                usleep(3000);
+            }
+        }
+
+        //int index = mSlam->getNumberPoses() - 1;
+        int index = i++;
         if (index < 0){
             continue;
         }
@@ -45,14 +53,10 @@ void Viewer::run(){
 
         pangolin::FinishFrame();
 
+        usleep(7000);
+
         if(isFinished())
             break;
-
-        if(isStopped()){
-            while(isStopped()){
-                usleep(3000);
-            }
-        }
     }
 
     finish();
@@ -73,12 +77,13 @@ void Viewer::drawConnections(int cameraIndex){
     glColor3f(0,1,0);
     glBegin(GL_LINES);
     for(unsigned int i = 0; i < observations.size(); i++){
-        glVertex3f((GLfloat) cameraTransl[0],(GLfloat) cameraTransl[1], (GLfloat) cameraTransl[2]);
         int pointIndex = observations[i].first;
         if (pointIndex < 0 || pointIndex >= structure3d.size()){
-            throw std::runtime_error("drawConnections() : 3D point index is out of bounds");
+            std::cerr << "drawConnections() : OUT OF BOUNDS , PointIndex: " << pointIndex << std::endl;
+            //throw std::runtime_error("drawConnections() : 3D point index is out of bounds");
+            continue;
         }
-
+        glVertex3f((GLfloat) cameraTransl[0],(GLfloat) cameraTransl[1], (GLfloat) cameraTransl[2]);
         glVertex3f((GLfloat) structure3d[pointIndex].x,(GLfloat) structure3d[pointIndex].y, (GLfloat) structure3d[pointIndex].z);
     }
     glEnd();
@@ -163,6 +168,55 @@ void Viewer::drawPose(int cameraIndex){
 
     glEnd();
     glPopMatrix();
+
+    glPushMatrix();
+
+    Sophus::Matrix4f g = mSlam->getGTPose(cameraIndex).matrix().cast<float>();
+    glMultMatrixf((GLfloat *) g.data());
+    glColor3f(0, 0, 1);
+    glLineWidth(2);
+    glBegin(GL_LINES);
+//    glVertex3f(0, 0, 0);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
+//    glVertex3f(0, 0, 0);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(0, 0, 0);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(0, 0, 0);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
+//    glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
+//    glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
+
+    glVertex3f(0,0,0);
+    glVertex3f(w,h,z);
+    glVertex3f(0,0,0);
+    glVertex3f(w,-h,z);
+    glVertex3f(0,0,0);
+    glVertex3f(-w,-h,z);
+    glVertex3f(0,0,0);
+    glVertex3f(-w,h,z);
+
+    glVertex3f(w,h,z);
+    glVertex3f(w,-h,z);
+
+    glVertex3f(-w,h,z);
+    glVertex3f(-w,-h,z);
+
+    glVertex3f(-w,h,z);
+    glVertex3f(w,h,z);
+
+    glVertex3f(-w,-h,z);
+    glVertex3f(w,-h,z);
+    glEnd();
+
+    glEnd();
+    glPopMatrix();
 }
 
 void Viewer::stop(){
@@ -173,6 +227,11 @@ void Viewer::stop(){
 void Viewer::finish(){
     std::unique_lock<std::mutex> lock(mMutexFinish);
     mFinished = true;
+}
+
+void Viewer::resume() {
+    std::unique_lock<std::mutex> lock(mMutexStop);
+    mStopped = false;
 }
 
 bool Viewer::isStopped(){

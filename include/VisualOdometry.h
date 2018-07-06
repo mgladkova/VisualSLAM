@@ -51,7 +51,7 @@ class VisualOdometry {
 
         void get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsPrevFrame, std::vector<cv::KeyPoint> keypointsCurrentFrame, std::vector<cv::DMatch> matches, std::vector<cv::Point2f>& p2dPrevFrame, std::vector<cv::Point2f>& p2dCurrentFrame);
 
-        void estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d, Eigen::Matrix3d K, Sophus::SE3d& pose);
+        void estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d_PrevFrame, std::vector<cv::Point2f>& p2d_CurrentFrame, std::vector<int>& indices,  Eigen::Matrix3d K, Sophus::SE3d& pose);
         void estimatePose2D2D(std::vector<cv::Point2f> p2d_1, std::vector<cv::Point2f> p2d_2, Eigen::Matrix3d K, Sophus::SE3d& pose);
 
         std::vector<uchar> trackFeatures(const cv::Mat prevFrame, const cv::Mat currFrame, std::vector<cv::Point2f>& currFramePoints, std::vector<cv::Point2f>& prevFramePoints,

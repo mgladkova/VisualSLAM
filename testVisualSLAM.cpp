@@ -41,13 +41,11 @@ int main(int argc, char** argv){
     cv::Mat descriptors;
     Eigen::Matrix3d cumR = Eigen::Matrix3d::Identity();
 
-    Viewer* viewer = new Viewer(slam);
-    std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
-
     int k = 1;
 
-    for (int i = 0; i < num_images; i++){
+    std::vector<cv::Mat> images_left(num_images), images_right(num_images);
 
+    for (int i = 0; i < num_images; i++){
         if (i == std::pow(10, k)){
             image_name_template = image_name_template.substr(0, image_name_template.length() - 1);
             k++;
@@ -55,10 +53,8 @@ int main(int argc, char** argv){
 
         std::string image_left_name = input_left_images_path + image_name_template + std::to_string(i) + ".png";
         std::string image_right_name = input_right_images_path + image_name_template + std::to_string(i) + ".png";
-        cv::Mat image_left = cv::imread(image_left_name, 0), image_left_BGR;
+        cv::Mat image_left = cv::imread(image_left_name, 0);
         cv::Mat image_right = cv::imread(image_right_name, 0);
-
-        cv::cvtColor(image_left, image_left_BGR, CV_GRAY2BGR);
 
         if (image_left.cols == 0 || image_left.rows == 0){
             throw std::runtime_error("Cannot read the image with the path: " + image_left_name);
@@ -67,8 +63,15 @@ int main(int argc, char** argv){
         if (image_right.cols == 0 || image_right.rows == 0){
             throw std::runtime_error("Cannot read the image with the path: " + image_right_name);
         }
-        Sophus::SE3d pose = slam.performFrontEndStepWithTracking(image_left, image_right, pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
-        plot2DPoints(image_left, pointsCurrentFrame);
+
+        image_left.copyTo(images_left[i]);
+        image_right.copyTo(images_right[i]);
+
+    }
+
+    for (int i = 0; i < num_images; i++){
+        Sophus::SE3d pose = slam.performFrontEndStepWithTracking(images_left[i], images_right[i], pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
+        //plot2DPoints(images_left[i], pointsCurrentFrame);
 
         Sophus::SE3d cumPose;
         if (i != 0){
@@ -91,7 +94,11 @@ int main(int argc, char** argv){
     visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
 #endif
 
-    viewerThread->join();
+    Viewer* viewer = new Viewer(slam);
+    viewer->run(num_images);
+    //std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
+
+    //viewerThread->join();
     delete viewer;
 
     cv::imwrite("result_trajectories.png", window);

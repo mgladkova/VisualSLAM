@@ -1,3 +1,7 @@
+#include <mutex>
+#include <thread>
+#include <chrono>
+
 #pragma once
 
 #include "BundleAdjuster.h"
@@ -15,9 +19,13 @@ private:
     Eigen::Matrix3d K;
 
     std::vector<Sophus::SE3d> groundTruthData;
+
 public:
 	VisualSLAM();
+
     Sophus::SE3d getPose(int index);
+    Sophus::SE3d getGTPose(int index) const;
+
     std::vector<Sophus::SE3d> getPoses() const;
     int getNumberPoses() const;
     Eigen::Matrix3d getCameraMatrix() const;

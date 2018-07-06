@@ -11,8 +11,8 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
 
     for (int i = 0; i < points3D.size(); i++){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
+        std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         pointWorldCoord = cumPose.inverse()*pointWorldCoord;
-        //std::cout << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         structure3D.insert(structure3D.end(), cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]));
     }
 }
@@ -30,7 +30,13 @@ void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> obs
         newObservations.push_back(std::make_pair(offsetIndex + indices[i], observedPoints[i]));
     }
 
-    observations[currentCameraIndex] = newObservations;
+    if (observations.find(currentCameraIndex) == observations.end()){
+        observations[currentCameraIndex] = newObservations;
+    } else {
+        std::cout << "Old size: " << observations[currentCameraIndex].size() << std::endl;
+        observations[currentCameraIndex].insert(observations[currentCameraIndex].end(), newObservations.begin(), newObservations.end());
+        std::cout << "New size: " << observations[currentCameraIndex].size() << std::endl;
+    }
 }
 
 void Map::updateCumulativePose(Sophus::SE3d newTransform){
@@ -81,13 +87,16 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
         throw std::runtime_error("updatePoints3D() : No point indices are given");
     }
 
-    for (auto i = 0; i < uniquePointIndices.size(); i++){
+    int k = 0;
+    for (auto i : uniquePointIndices){
         if (i < 0 || i > structure3D.size()){
             throw std::runtime_error("updatePoints3D() : index out of bounds!");
         }
-        Eigen::Vector3d v(points3DArray[3*i], points3DArray[3*i + 1], points3DArray[3*i + 2]);
+
+        //Eigen::Vector3d v(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
         //v = firstCamera*v;
-        structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
+        structure3D[i] = cv::Point3f(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
+        k++;
     }
 }
 
