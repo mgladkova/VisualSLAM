@@ -185,7 +185,7 @@ std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2
         float x = z*(p.x - cx) / fx;
         float y = z*(p.y - cy) / fy;
 
-        //std::cout << x << " " << y << " " << z << " " << disparity << std::endl;
+        std::cout << x << " " << y << " " << z << " " << disparity << std::endl;
 
         points3D.push_back(cv::Point3f(x,y,z));
     }
@@ -207,7 +207,11 @@ void VisualOdometry::get2D2DCorrespondences(std::vector<cv::KeyPoint> keypointsP
     }
 }
 
-void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d, std::vector<cv::Point2f>& p2d_PrevFrame, std::vector<cv::Point2f>& p2d_CurrentFrame, std::vector<int>& indices, Eigen::Matrix3d K, Sophus::SE3d& pose){
+void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d,
+                                      std::vector<cv::Point2f>& p2d_PrevFrame,
+                                      std::vector<cv::Point2f>& p2d_CurrentFrame,
+                                      std::vector<int>& indices,
+                                      Eigen::Matrix3d K, Sophus::SE3d& pose){
     cv::Mat cameraMatrix;
     cv::Mat distCoeffs = cv::Mat::zeros(4,1,CV_64F);
     cv::Mat rvec,tvec,rot_matrix;
@@ -298,7 +302,7 @@ std::vector<uchar> VisualOdometry::trackFeatures(const cv::Mat prevFrame, const 
     }
 
     std::cout << "Tracked size: " << numTracked << " / " << status.size() << std::endl;
-    std::cout << prevFramePoints.size() << " " << currFramePoints.size() << std::endl;
+    //std::cout << prevFramePoints.size() << " " << currFramePoints.size() << std::endl;
 
     if (numTracked < thresholdNumberFeatures){
         initialize = true;

@@ -2,7 +2,7 @@
 
 BundleAdjuster::BundleAdjuster() {}
 
-void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* camera){
+void BundleAdjuster::prepareDataForBA(Map& map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* camera){
     std::vector<cv::Point3f> structure3D = map.getStructure3D();
 
     if (structure3D.empty()){
@@ -14,6 +14,7 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
     Sophus::SE3d firstCameraCumPose = cameraCumPoses[startFrame];
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
+        //Sophus::SE3d cameraPose = cameraCumPoses[i]*firstCameraCumPose.inverse();
         Sophus::SE3d cameraPose = cameraCumPoses[i];
 
         Eigen::Matrix3d rotation = cameraPose.so3().matrix();
@@ -39,14 +40,18 @@ void BundleAdjuster::prepareDataForBA(Map map, int startFrame, int currentCamera
         }
 
         Eigen::Vector3d pointRelPose(structure3D[*it].x, structure3D[*it].y, structure3D[*it].z);
+        //pointRelPose = firstCameraCumPose*pointRelPose;
+
         points3D[3*k] = pointRelPose[0];
         points3D[3*k + 1] = pointRelPose[1];
         points3D[3*k + 2] = pointRelPose[2];
+
+        //std::cout << "POINT " << *it << " " << pointRelPose[0] << " " << pointRelPose[1] << " " << pointRelPose[2] << " " << std::endl;
         k++;
     }
 }
 
-void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames){
+void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep, int numKeyFrames){
     int currentCameraIndex = map.getCurrentCameraIndex();
     int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
 
@@ -56,6 +61,8 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
 
     std::set<int> uniquePointIndices;
     std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = map.getObservations();
+
+    std::cout << "START FRAME: " << startFrame << std::endl;
 
     for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
         for (int j = 0; j < observations[i].size(); j++){
@@ -77,12 +84,12 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
             ceres::CostFunction* cost_fun = ReprojectionError::Create(observations[i][j].second.x, observations[i][j].second.y);
             int pointIndex = std::distance(uniquePointIndices.begin(), uniquePointIndices.find(observations[i][j].first));
             int cameraIndex = (i - startFrame) / keyFrameStep;
-            //std::cout << cameraPose + 7*cameraIndex << " " << cameraPose[7*cameraIndex] << std::endl;
-            //std::cout << points3DArray + 3*pointIndex << " " << points3DArray[3*pointIndex] << std::endl;
 
             problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose[7*cameraIndex]), &(points3DArray[3*pointIndex]));
         }
     }
+
+    problem.SetParameterBlockConstant(cameraPose);
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -93,7 +100,7 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    std::cout << summary.FullReport() << "\n";
+    //std::cout << summary.FullReport() << "\n";
 
     Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
     map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
@@ -104,8 +111,16 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, 
         Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
 
         Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
+
+        //newPose = newPose*firstFrame;
         std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
-        std::cout << "New pose " << i << " : " << newPose.matrix() << std::endl;
-        map.setCameraPose(i, newPose);
+
+        int MAX_POSE_NORM = 100;
+        if (newPose.log().norm() <= MAX_POSE_NORM){
+            map.setCameraPose(i, newPose);
+        }
+
+        std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
+
     }
 }

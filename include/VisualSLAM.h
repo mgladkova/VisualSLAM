@@ -34,6 +34,7 @@ public:
     std::vector<cv::Point3f> getStructure3D() const;
     std::vector<std::pair<int, cv::Point2f>> getObservationsForCamera(int cameraIndex);
 
+    void getDataForDrawing(int& cameraIndex, Sophus::SE3d& camera, std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices, Sophus::SE3d& gtCamera);
 	void readCameraIntrisics(std::string camera_intrinsics_file);
     void readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData);
     Sophus::SE3d performFrontEndStep(cv::Mat image_left, cv::Mat image_right, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame); // feature detection / tracking and matching

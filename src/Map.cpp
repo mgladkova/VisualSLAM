@@ -2,7 +2,9 @@
 
 Map::Map() {
     currentCameraIndex = 0;
-    offsetIndex = 0;
+    offset = 0;
+    mReadyToProcess = false;
+    mProcessed = true;
 }
 
 void Map::addPoints3D(std::vector<cv::Point3f> points3D){
@@ -11,32 +13,34 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
 
     for (int i = 0; i < points3D.size(); i++){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
-        std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
+        //std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         pointWorldCoord = cumPose.inverse()*pointWorldCoord;
-        structure3D.insert(structure3D.end(), cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]));
+        std::cout << "Point ADDED " << offset + i << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
+        points3D[i] = cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]);
     }
+
+    if (structure3D.empty()){
+        structure3D = points3D;
+    } else {
+       structure3D.insert(structure3D.end(), points3D.begin(), points3D.end());
+    }
+
 }
 
-void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> observedPoints, bool newBatch){
+void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> observedPoints){
     std::vector<std::pair<int, cv::Point2f>> newObservations;
 
     assert(indices.size() == observedPoints.size());
 
-    if (newBatch){
-        offsetIndex = structure3D.size();
-    }
-
     for (auto i = 0; i < observedPoints.size(); i++){
-        newObservations.push_back(std::make_pair(offsetIndex + indices[i], observedPoints[i]));
+        if (offset + indices[i] > structure3D.size() || offset + indices[i] < 0){
+            std::cerr << "addObservations() : Index " << offset + indices[i] << " out of bounds!" << std::endl;
+            throw std::runtime_error("addObservations() : Index out of bounds");
+        }
+        newObservations.push_back(std::make_pair(offset + indices[i], observedPoints[i]));
     }
 
-    if (observations.find(currentCameraIndex) == observations.end()){
-        observations[currentCameraIndex] = newObservations;
-    } else {
-        std::cout << "Old size: " << observations[currentCameraIndex].size() << std::endl;
-        observations[currentCameraIndex].insert(observations[currentCameraIndex].end(), newObservations.begin(), newObservations.end());
-        std::cout << "New size: " << observations[currentCameraIndex].size() << std::endl;
-    }
+    observations[currentCameraIndex] = newObservations;
 }
 
 void Map::updateCumulativePose(Sophus::SE3d newTransform){
@@ -93,9 +97,13 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
             throw std::runtime_error("updatePoints3D() : index out of bounds!");
         }
 
-        //Eigen::Vector3d v(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
-        //v = firstCamera*v;
-        structure3D[i] = cv::Point3f(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
+        Eigen::Vector3d v(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
+        double vecBALen = std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+        double vecPrevLen = std::sqrt(structure3D[i].x*structure3D[i].x + structure3D[i].y*structure3D[i].y + structure3D[i].z*structure3D[i].z);
+        if (vecBALen < 200 && vecBALen > 0.1){
+            //v = firstCamera.inverse()*v;
+            structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
+        }
         k++;
     }
 }
@@ -103,6 +111,68 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
 void Map::updateCameraIndex(){
     currentCameraIndex = currentCameraIndex + 1;
 }
+
+void Map::getDataForDrawing(int& cameraIndex,
+                            Sophus::SE3d& camera,
+                            std::vector<cv::Point3f>& structure3d,
+                            std::vector<int>& obsIndices,
+                            Sophus::SE3d& gtCamera){
+    {
+        std::unique_lock<std::mutex> lock(mReadWriteMutex);
+        mCondVar.wait(lock, [this]{return mReadyToProcess;});
+
+        cameraIndex = getCurrentCameraIndex() - 1;
+        //std::cout << "CAMERA INDEX: " << cameraIndex << std::endl;
+        camera = getCumPoseAt(cameraIndex);
+        structure3d = getStructure3D();
+
+        std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = getObservations();
+
+        obsIndices.clear();
+
+        for (int i = 0; i < observations[cameraIndex].size(); i++){
+           obsIndices.push_back(observations[cameraIndex][i].first);
+        }
+
+        gtCamera = getCumPoseAt(cameraIndex); // TO-DO change to GT data
+
+        mProcessed = true;
+        //mReadyToProcess = false;
+    }
+
+    mCondVar.notify_one();
+}
+
+void Map::updateDataCurrentFrame(Sophus::SE3d& pose,
+                                 std::vector<cv::Point2f>& trackedCurrFramePoints,
+                                 std::vector<int>& trackedPointIndices,
+                                 std::vector<cv::Point3f>& points3DCurrentFrame,
+                                 bool addPoints){
+    {
+        std::unique_lock<std::mutex> lock(mReadWriteMutex);
+        mCondVar.wait(lock, [this]{return mProcessed;});
+
+        std::cout << "Updating camera " << currentCameraIndex << std::endl;
+
+        updateCumulativePose(pose);
+
+        if (addPoints){
+            offset = structure3D.size();
+            std::cout << "OFFSET " << offset << std::endl;
+            addPoints3D(points3DCurrentFrame);
+        }
+
+        addObservations(trackedPointIndices, trackedCurrFramePoints);
+
+        updateCameraIndex();
+
+        mReadyToProcess = true;
+        //mProcessed = false;
+    }
+
+    mCondVar.notify_one();
+}
+
 
 void Map::writeBAFile(std::string fileName, int keyFrameStep, int numKeyFrames) {
     std::ofstream file;

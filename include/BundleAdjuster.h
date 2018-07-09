@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Dense>
 #include <sophus/se3.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -79,6 +79,6 @@ public:
 class BundleAdjuster {
 public:
         BundleAdjuster();
-        void optimizeCameraPosesForKeyframes(Map map, int keyFrameStep, int numKeyFrames);
-        void prepareDataForBA(Map map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* cameraPose);
+        void optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep, int numKeyFrames);
+        void prepareDataForBA(Map& map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* cameraPose);
 };

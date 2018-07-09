@@ -69,6 +69,9 @@ int main(int argc, char** argv){
 
     }
 
+    Viewer* viewer = new Viewer(slam);
+    std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
+
     for (int i = 0; i < num_images; i++){
         Sophus::SE3d pose = slam.performFrontEndStepWithTracking(images_left[i], images_right[i], pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
         //plot2DPoints(images_left[i], pointsCurrentFrame);
@@ -94,11 +97,7 @@ int main(int argc, char** argv){
     visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
 #endif
 
-    Viewer* viewer = new Viewer(slam);
-    viewer->run(num_images);
-    //std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
-
-    //viewerThread->join();
+    viewerThread->join();
     delete viewer;
 
     cv::imwrite("result_trajectories.png", window);
