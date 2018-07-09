@@ -38,8 +38,8 @@ class VisualOdometry {
         void setKeyFrameKeypoints(std::vector<cv::KeyPoint> updatedKeypoints);
         std::vector<cv::Point2d> get2DPointsKeyFrame();
 
-        std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K);
-        std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K);
+        std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status);
+        std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status);
 
         cv::Mat getDisparityMap(const cv::Mat image_left, const cv::Mat image_right);
         cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);

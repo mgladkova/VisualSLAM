@@ -11,9 +11,11 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
     // convert points from camera to world coordinate system
     Sophus::SE3d cumPose = cumPoses[currentCameraIndex];
 
+    std::cout << cumPose.matrix() << std::endl;
+
     for (int i = 0; i < points3D.size(); i++){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
-        //std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
+        std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         pointWorldCoord = cumPose.inverse()*pointWorldCoord;
         std::cout << "Point ADDED " << offset + i << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         points3D[i] = cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]);
@@ -98,10 +100,8 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
         }
 
         Eigen::Vector3d v(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
-        double vecBALen = std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-        double vecPrevLen = std::sqrt(structure3D[i].x*structure3D[i].x + structure3D[i].y*structure3D[i].y + structure3D[i].z*structure3D[i].z);
-        if (vecBALen < 200 && vecBALen > 0.1){
-            //v = firstCamera.inverse()*v;
+        //v = firstCamera.inverse()*v;
+        if (v[2] > 0 && v[2] < 1000){
             structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
         }
         k++;
@@ -143,10 +143,10 @@ void Map::getDataForDrawing(int& cameraIndex,
     mCondVar.notify_one();
 }
 
-void Map::updateDataCurrentFrame(Sophus::SE3d& pose,
-                                 std::vector<cv::Point2f>& trackedCurrFramePoints,
-                                 std::vector<int>& trackedPointIndices,
-                                 std::vector<cv::Point3f>& points3DCurrentFrame,
+void Map::updateDataCurrentFrame(Sophus::SE3d pose,
+                                 std::vector<cv::Point2f> trackedCurrFramePoints,
+                                 std::vector<int> trackedPointIndices,
+                                 std::vector<cv::Point3f> points3DCurrentFrame,
                                  bool addPoints){
     {
         std::unique_lock<std::mutex> lock(mReadWriteMutex);
@@ -209,7 +209,7 @@ void Map::writeBAFile(std::string fileName, int keyFrameStep, int numKeyFrames) 
             file << int((i  - startFrame) / keyFrameStep) << " " << int(observations[i][j].first) << " " << double(observations[i][j].second.x) << " " << double(observations[i][j].second.y) << std::endl;
         }
     }
-
+    file << "CAMERAS" << std::endl;
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
         if (i >= cumPoses.size()){
             throw std::runtime_error("writeBAFile() : Index out of bounds for pose extraction!");
@@ -243,13 +243,11 @@ void Map::writeBAFile(std::string fileName, int keyFrameStep, int numKeyFrames) 
         file << 0.0 << std::endl;
         file << 0.0 << std::endl;*/
     }
-
+    file << "POINTS 3D" << std::endl;
     for (auto it = uniquePointIndices.begin(); it != uniquePointIndices.end(); it++){
         int index = *it;
         if (index >= 0 && index < structure3D.size()){
-            file << double(structure3D[index].x) << std::endl;
-            file << double(structure3D[index].y) << std::endl;
-            file << double(structure3D[index].z) << std::endl;
+            file << index << " " << float(structure3D[index].x) << " " << float(structure3D[index].y) << " " << float(structure3D[index].z) << std::endl;
         }
     }
 

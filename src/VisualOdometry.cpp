@@ -126,17 +126,17 @@ std::vector<cv::Point2d> VisualOdometry::get2DPointsKeyFrame(){
     return points;
 }
 
-std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K){
+std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status){
     std::vector<cv::Point2f> points2D;
 
     for (auto& keyPt: keypoints){
         points2D.push_back(keyPt.pt);
     }
 
-    return get3DCoordinates(points2D, disparity_map, K);
+    return get3DCoordinates(points2D, disparity_map, K, status);
 }
 
-std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K){
+std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status){
     float b = 0.53716;
     float fx = K(0,0);
     float fy = K(1,1);
@@ -144,18 +144,18 @@ std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2
     float cy = K(1,2);
 
     float f = (fx + fy) / 2;
-    std::vector<cv::Point3f> points3D;
+    std::vector<cv::Point3f> points3D(points2D.size());
+    status.clear();
+    status.resize(points2D.size());
 
-    cv::Mat mask = disparity_map > 0;
-
-    double minPosValue = 0.1;
-    cv::minMaxLoc(disparity_map, &minPosValue, NULL, NULL, NULL, mask);
+    float MINDISPARITY = 0.001;
+    float MAXDISPARITY = 1000;
 
     for (int i = 0; i < points2D.size(); i++) {
         cv::Point2f p = points2D[i];
         //std::cout << p.x << " " << p.y << std::endl;
         float disparity = disparity_map.at<float>(p.y, p.x);
-        if (disparity < 0.1){
+        if (disparity < MINDISPARITY || disparity > MAXDISPARITY){
             // compute the average depth over the path around the point
             float neighborDisparities[4] = {0};
             if (p.x - 1 >= 0){
@@ -177,17 +177,18 @@ std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2
             disparity = (neighborDisparities[0] + neighborDisparities[1] + neighborDisparities[2] + neighborDisparities[3]) / 4;
         }
 
-        if (disparity < 0.1){
-            disparity = minPosValue;
-        }
-
         float z = f*b/disparity;
         float x = z*(p.x - cx) / fx;
         float y = z*(p.y - cy) / fy;
 
-        std::cout << x << " " << y << " " << z << " " << disparity << std::endl;
+        if (z < MINDISPARITY || z > MAXDISPARITY){
+            status[i] = 0;
+        } else {
+            status[i] = 1;
+            //std::cout << x << " " << y << " " << z << " " << disparity << std::endl;
+        }
 
-        points3D.push_back(cv::Point3f(x,y,z));
+        points3D[i] = cv::Point3f(x,y,z);
     }
 
     return points3D;

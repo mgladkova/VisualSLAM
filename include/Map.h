@@ -41,7 +41,7 @@ public:
     Sophus::SE3d getCumPoseAt(int index) const;
 
     void getDataForDrawing(int& cameraIndex, Sophus::SE3d& camera, std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices, Sophus::SE3d& gtCamera);
-    void updateDataCurrentFrame(Sophus::SE3d& pose, std::vector<cv::Point2f>& trackedCurrFramePoints, std::vector<int>& trackedPointIndices, std::vector<cv::Point3f>& points3DCurrentFrame, bool addPoints);
+    void updateDataCurrentFrame(Sophus::SE3d pose, std::vector<cv::Point2f> trackedCurrFramePoints, std::vector<int> trackedPointIndices, std::vector<cv::Point3f> points3DCurrentFrame, bool addPoints);
 
     int getCurrentCameraIndex() const;
     void updateCameraIndex();

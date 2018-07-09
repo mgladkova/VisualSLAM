@@ -89,8 +89,6 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep,
         }
     }
 
-    problem.SetParameterBlockConstant(cameraPose);
-
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = false;
@@ -113,14 +111,14 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep,
         Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
 
         //newPose = newPose*firstFrame;
-        std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
+        //std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
 
         int MAX_POSE_NORM = 100;
         if (newPose.log().norm() <= MAX_POSE_NORM){
             map.setCameraPose(i, newPose);
         }
 
-        std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
+        //std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
 
     }
 }
