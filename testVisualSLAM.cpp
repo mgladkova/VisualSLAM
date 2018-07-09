@@ -69,8 +69,10 @@ int main(int argc, char** argv){
 
     }
 
+#ifdef VIS_POINTCLOUD
     Viewer* viewer = new Viewer(slam);
     std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
+#endif
 
     for (int i = 0; i < num_images; i++){
         Sophus::SE3d pose = slam.performFrontEndStepWithTracking(images_left[i], images_right[i], pointsCurrentFrame, pointsPrevFrame, prevImageLeft);
@@ -93,12 +95,11 @@ int main(int argc, char** argv){
         }
 #endif
     }
-#ifdef VIS_POSES
-    visualizeAllPoses(slam.getPoses(), slam.getCameraMatrix());
-#endif
 
+#ifdef VIS_POINTCLOUD
     viewerThread->join();
     delete viewer;
+#endif
 
     cv::imwrite("result_trajectories.png", window);
     return 0;

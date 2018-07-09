@@ -15,7 +15,9 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
         Eigen::Vector3d pointWorldCoord(points3D[i].x, points3D[i].y, points3D[i].z);
         //std::cout << "Camera " << currentCameraIndex << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
         pointWorldCoord = cumPose.inverse()*pointWorldCoord;
+#ifdef DEBUG_PRINT
         std::cout << "Point ADDED " << offset + i << " : " << pointWorldCoord[0] << " " << pointWorldCoord[1] << " " << pointWorldCoord[2] << std::endl;
+#endif
         points3D[i] = cv::Point3f(pointWorldCoord[0],pointWorldCoord[1],pointWorldCoord[2]);
     }
 
