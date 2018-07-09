@@ -23,5 +23,5 @@ include_directories(${CERES_INCLUDE_DIRS})
 
 include_directories("./include")
 
-add_executable(slam testVisualSLAM.cpp src/VisualSLAM.cpp src/Map.cpp src/VisualOdometry.cpp src/VisualizationToolkit.cpp src/BundleAdjuster.cpp)
+add_executable(slam testVisualSLAM.cpp src/VisualSLAM.cpp src/Map.cpp src/VisualOdometry.cpp src/Viewer.cpp src/VisualizationToolkit.cpp src/BundleAdjuster.cpp)
 target_link_libraries(slam ${OpenCV_LIBS} ${CERES_LIBRARIES} ${Pangolin_LIBRARIES} ${Sophus_LIBRARIES})
