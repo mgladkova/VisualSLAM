@@ -1,4 +1,5 @@
 #include "BundleAdjuster.h"
+#include "PoseGraph3dErrorTerm.h"
 
 BundleAdjuster::BundleAdjuster() {}
 
@@ -51,7 +52,7 @@ void BundleAdjuster::prepareDataForBA(Map& map, int startFrame, int currentCamer
     }
 }
 
-void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep, int numKeyFrames){
+bool BundleAdjuster::performBAWithKeyFrames(Map& map, int keyFrameStep, int numKeyFrames){
     int currentCameraIndex = map.getCurrentCameraIndex();
     int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
 
@@ -89,6 +90,8 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep,
         }
     }
 
+    problem.SetParameterBlockConstant(cameraPose);
+
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = false;
@@ -100,25 +103,103 @@ void BundleAdjuster::optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep,
     ceres::Solve(options, &problem, &summary);
     //std::cout << summary.FullReport() << "\n";
 
-    Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
-    map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
+    if (summary.IsSolutionUsable()){
+        Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
+        map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
 
-    for (int i = startFrame; i < currentCameraIndex; i+=keyFrameStep){
-        int cameraIndex = (i - startFrame) / keyFrameStep;
-        Eigen::Quaterniond q(cameraPose[7*cameraIndex], cameraPose[7*cameraIndex + 1], cameraPose[7*cameraIndex + 2], cameraPose[7*cameraIndex + 3]);
-        Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
+        for (int i = startFrame; i < currentCameraIndex; i+=keyFrameStep){
+            int cameraIndex = (i - startFrame) / keyFrameStep;
+            Eigen::Quaterniond q(cameraPose[7*cameraIndex], cameraPose[7*cameraIndex + 1], cameraPose[7*cameraIndex + 2], cameraPose[7*cameraIndex + 3]);
+            Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
 
-        Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
+            Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
 
-        //newPose = newPose*firstFrame;
-        //std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
+            //newPose = newPose*firstFrame;
+            //std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
 
-        int MAX_POSE_NORM = 100;
-        if (newPose.log().norm() <= MAX_POSE_NORM){
-            map.setCameraPose(i, newPose);
+            int MAX_POSE_NORM = 100;
+            if (newPose.log().norm() <= MAX_POSE_NORM){
+                map.setCameraPose(i, newPose);
+            }
+
+            //std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
+
+        }
+    }
+
+    return summary.IsSolutionUsable();
+}
+
+bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right, int keyFrameStep, int numKeyFrames) {
+    int currentCameraIndex = map_left.getCurrentCameraIndex();
+    int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
+
+    if (startFrame < 0){
+        throw std::runtime_error("prepareDataForBA() : Start frame index out of bounds!");
+    }
+    ceres::Problem problem;
+    ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
+    ceres::LocalParameterization* quaternion_local_parameterization =
+        new ceres::EigenQuaternionParameterization;
+
+    double confid = 1e5;
+    Eigen::Matrix<double, 6, 6> information_matrix = Eigen::MatrixXd::Identity(6, 6)*confid;
+    Pose3d constraint;
+    double baseline = 0.53716;
+    constraint.p = Eigen::Vector3d(0, -baseline, 0);
+    constraint.q = Eigen::Quaterniond(0,0,0,0);
+
+    std::vector<Sophus::SE3d> posesLeftImage = map_left.getCumPoses();
+    std::vector<Sophus::SE3d> posesRightImage = map_right.getCumPoses();
+
+
+    for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep) {
+
+        if (i < 0 || i >= posesLeftImage.size() || i >= posesRightImage.size()){
+            throw std::runtime_error("performPoseGraphOptimization() : Pose index out of bounds");
         }
 
-        //std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
+        ceres::CostFunction* cost_function =
+                PoseGraph3dErrorTerm::Create(constraint, information_matrix);
 
+        problem.AddResidualBlock(cost_function, loss_function,
+                                  posesLeftImage[i].translation().data(),
+                                  posesLeftImage[i].so3().unit_quaternion().matrix().data(),
+                                  posesRightImage[i].translation().data(),
+                                  posesRightImage[i].so3().unit_quaternion().matrix().data());
+
+        problem.SetParameterization(posesLeftImage[i].so3().unit_quaternion().matrix().data(),
+                                     quaternion_local_parameterization);
+        problem.SetParameterization(posesRightImage[i].so3().unit_quaternion().matrix().data(),
+                                     quaternion_local_parameterization);
     }
+
+    problem.SetParameterBlockConstant(posesLeftImage[startFrame].translation().data());
+    problem.SetParameterBlockConstant(posesLeftImage[startFrame].so3().unit_quaternion().matrix().data());
+
+    ceres::Solver::Options options;
+    options.max_num_iterations = 200;
+    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+
+    std::cout << summary.FullReport() << std::endl;
+
+    int MAX_POSE_NORM = 100;
+
+    if (summary.IsSolutionUsable()){
+        for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
+
+            if (posesLeftImage[i].log().norm() <= MAX_POSE_NORM){
+                map_left.setCameraPose(i, posesLeftImage[i]);
+            }
+
+            if (posesRightImage[i].log().norm() <= MAX_POSE_NORM){
+                map_right.setCameraPose(i, posesRightImage[i]);
+            }
+        }
+    }
+
+    return summary.IsSolutionUsable();
 }

@@ -79,6 +79,7 @@ public:
 class BundleAdjuster {
 public:
         BundleAdjuster();
-        void optimizeCameraPosesForKeyframes(Map& map, int keyFrameStep, int numKeyFrames);
+        bool performBAWithKeyFrames(Map& map, int keyFrameStep, int numKeyFrames);
+        bool performPoseGraphOptimization(Map& map_left, Map& map_right, int keyFrameStep, int numKeyFrames);
         void prepareDataForBA(Map& map, int startFrame, int currentCameraIndex, int keyFrameStep, std::set<int> pointIndices, double* points3D, double* cameraPose);
 };

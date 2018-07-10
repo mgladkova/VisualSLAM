@@ -33,7 +33,7 @@ void Viewer::run(){
         std::vector<cv::Point3f> structure3d;
         std::vector<int> obsIndices;
 
-        mSlam->getDataForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
+        mSlam->getDataFromImageLeftForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
 
         drawPose(camera);
         drawPose(gtCamera);

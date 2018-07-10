@@ -41,9 +41,6 @@ class VisualOdometry {
         std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::Point2f> points2D, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status);
         std::vector<cv::Point3f> get3DCoordinates(std::vector<cv::KeyPoint> keypoints, cv::Mat disparity_map, Eigen::Matrix3d K, std::vector<uchar>& status);
 
-        cv::Mat getDisparityMap(const cv::Mat image_left, const cv::Mat image_right);
-        cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);
-
         void extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new);
 
         std::vector<cv::DMatch> findGoodORBFeatureMatches(std::vector<cv::KeyPoint> keypointsPrevFrame, std::vector<cv::KeyPoint> keypointsCurrentFrame,

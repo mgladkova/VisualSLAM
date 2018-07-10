@@ -30,68 +30,6 @@ void VisualOdometry::setKeyFrameKeypoints(std::vector<cv::KeyPoint> updatedKeypo
     refFrame.keypoints = updatedKeypoints;
 }
 
-
-cv::Rect VisualOdometry::computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance)
-{
-    int min_disparity = matcher_instance->getMinDisparity();
-    int num_disparities = matcher_instance->getNumDisparities();
-    int block_size = matcher_instance->getBlockSize();
-
-    int bs2 = block_size/2;
-    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
-
-    int xmin = maxD + bs2;
-    int xmax = src_sz.width + minD - bs2;
-    int ymin = bs2;
-    int ymax = src_sz.height - bs2;
-
-    cv::Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
-    return r;
-}
-
-cv::Mat VisualOdometry::getDisparityMap(const cv::Mat image_left, const cv::Mat image_right){
-    cv::Mat disparity, true_dmap, disparity_norm;
-    cv::Rect ROI;
-    int min_disparity = 0;
-    int number_of_disparities = 16*6 - min_disparity;
-    int kernel_size = 7;
-
-    cv::Ptr<cv::stereo::StereoBinarySGBM> sgbm = cv::stereo::StereoBinarySGBM::create(min_disparity, number_of_disparities, kernel_size);
-    // setting the penalties for sgbm
-    sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
-
-    sgbm->setP1(8*std::pow(kernel_size, 2));
-    sgbm->setP2(32*std::pow(kernel_size, 2));
-    sgbm->setMinDisparity(min_disparity);
-    sgbm->setUniquenessRatio(3);
-    sgbm->setSpeckleWindowSize(200);
-    sgbm->setSpeckleRange(32);
-    sgbm->setDisp12MaxDiff(1);
-    sgbm->setSpekleRemovalTechnique(cv::stereo::CV_SPECKLE_REMOVAL_AVG_ALGORITHM);
-    sgbm->setSubPixelInterpolationMethod(cv::stereo::CV_SIMETRICV_INTERPOLATION);
-
-    // setting the penalties for sgbm
-    ROI = computeROIDisparityMap(image_left.size(),sgbm);
-    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
-    wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
-    wls_filter->setDepthDiscontinuityRadius(2);
-
-    sgbm->compute(image_left, image_right, disparity);
-    wls_filter->setLambda(8000.0);
-    wls_filter->setSigmaColor(1.5);
-    wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
-
-    cv::Mat filtered_disp_vis;
-    cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
-    /*
-    cv::namedWindow("filtered disparity", cv::WINDOW_AUTOSIZE);
-    cv::imshow("filtered disparity", filtered_disp_vis);
-    cv::waitKey();
-    */
-    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
-    return true_dmap;
-}
-
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
     int max_features = 2000;
 	// Detect ORB features and compute descriptors.
@@ -153,6 +91,10 @@ std::vector<cv::Point3f> VisualOdometry::get3DCoordinates(std::vector<cv::Point2
 
     for (int i = 0; i < points2D.size(); i++) {
         cv::Point2f p = points2D[i];
+        if (p.x < 0 || p.x >= disparity_map.cols || p.y < 0 || p.y >= disparity_map.rows){
+            status[i] = 0;
+            continue;
+        }
         //std::cout << p.x << " " << p.y << std::endl;
         float disparity = disparity_map.at<float>(p.y, p.x);
         if (disparity < MINDISPARITY || disparity > MAXDISPARITY){
