@@ -246,7 +246,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat dispari
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat disparity_map, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImage, bool isLeftImage){
-    int max_features = 550;
+    int max_features = 800;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
     cv::Size subPixWinSize(10,10);
 
@@ -285,7 +285,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
         return pose;
     }
 
-    int thresholdNumberFeatures = 150;
+    int thresholdNumberFeatures = 200;
     bool init = false;
     std::vector<uchar> validPoints3D;
 
@@ -308,7 +308,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     VO.estimatePose3D2D(trackedPoints3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints,  trackedPointIndices, K, pose);
 
     int keyFrameStep = 3;
-    int numKeyFrames = 5;
+    int numKeyFrames = 10;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -354,8 +354,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     if (isLeftImage){
         map_left.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
 
-        if ((map_left.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
-        //if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
+        //if ((map_left.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
+        if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
             std::string fileName = "BAFile" + std::to_string(map_left.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "L.txt";
             map_left.writeBAFile(fileName, keyFrameStep, numKeyFrames);
             BA.performBAWithKeyFrames(map_left, keyFrameStep, numKeyFrames);
@@ -363,8 +363,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     } else {
         map_right.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
 
-        if ((map_right.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
-        //if ((map_right.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_right.getCurrentCameraIndex() > 0){
+        //if ((map_right.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
+        if ((map_right.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_right.getCurrentCameraIndex() > 0){
             std::string fileName = "BAFile" + std::to_string(map_right.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "R.txt";
             map_right.writeBAFile(fileName, keyFrameStep, numKeyFrames);
             BA.performBAWithKeyFrames(map_right, keyFrameStep, numKeyFrames);

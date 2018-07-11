@@ -81,6 +81,7 @@ Sophus::SE3d Map::getCumPoseAt(int index) const{
 }
 
 void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
+    std::unique_lock<std::mutex> lock(mReadWriteMutex);
     if (i < 0 || i >= cumPoses.size()){
         throw std::runtime_error("setCameraPose() : Index is out of bounds!");
     }
@@ -89,6 +90,7 @@ void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
 }
 
 void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera){
+    std::unique_lock<std::mutex> lock(mReadWriteMutex);
     if (uniquePointIndices.empty()){
         throw std::runtime_error("updatePoints3D() : No point indices are given");
     }
@@ -121,12 +123,12 @@ void Map::getDataForDrawing(int& cameraIndex,
         std::unique_lock<std::mutex> lock(mReadWriteMutex);
         mCondVar.wait(lock, [this]{return mReadyToProcess;});
 
-        cameraIndex = getCurrentCameraIndex() - 1;
+        cameraIndex = this->currentCameraIndex - 1;
         //std::cout << "CAMERA INDEX: " << cameraIndex << std::endl;
         camera = getCumPoseAt(cameraIndex);
-        structure3d = getStructure3D();
+        structure3d = this->structure3D;
 
-        std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = getObservations();
+        std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = this->observations;
 
         obsIndices.clear();
 
@@ -155,11 +157,21 @@ void Map::updateDataCurrentFrame(Sophus::SE3d pose,
         std::cout << "Updating camera " << currentCameraIndex << std::endl;
 
         updateCumulativePose(pose);
-
         if (addPoints){
             offset = structure3D.size();
             std::cout << "OFFSET " << offset << std::endl;
             addPoints3D(points3DCurrentFrame);
+        }
+
+        for (int i = 0; i < trackedPointIndices.size(); i++){
+            Eigen::Vector3d p(structure3D[i].x, structure3D[i].y, structure3D[i].z);
+
+            p = cumPoses[currentCameraIndex]*p;
+
+            if (p[2] <= 0){
+                trackedPointIndices.erase(trackedPointIndices.begin() + i);
+                trackedCurrFramePoints.erase(trackedCurrFramePoints.begin() + i);
+            }
         }
 
         addObservations(trackedPointIndices, trackedCurrFramePoints);

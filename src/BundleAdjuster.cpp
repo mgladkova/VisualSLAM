@@ -91,17 +91,19 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map, int keyFrameStep, int numK
     }
 
     problem.SetParameterBlockConstant(cameraPose);
+    int lastCameraIndex = (currentCameraIndex - startFrame - 1) / keyFrameStep;
+    problem.SetParameterBlockConstant(&cameraPose[7*lastCameraIndex]);
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = false;
-    options.max_num_iterations = 100;
-    options.function_tolerance = 7e-5;
-    //options.dense_linear_algebra_library_type = ceres::LAPACK;
+    options.max_num_iterations = 200;
+    options.function_tolerance = 1e-5;
+    options.dense_linear_algebra_library_type = ceres::LAPACK;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    //std::cout << summary.FullReport() << "\n";
+    std::cout << summary.FullReport() << "\n";
 
     if (summary.IsSolutionUsable()){
         Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
@@ -142,11 +144,11 @@ bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right,
     ceres::LocalParameterization* quaternion_local_parameterization =
         new ceres::EigenQuaternionParameterization;
 
-    double confid = 1e5;
+    double confid = 1e-5;
     Eigen::Matrix<double, 6, 6> information_matrix = Eigen::MatrixXd::Identity(6, 6)*confid;
     Pose3d constraint;
     double baseline = 0.53716;
-    constraint.p = Eigen::Vector3d(0, -baseline, 0);
+    constraint.p = Eigen::Vector3d(0, baseline, 0);
     constraint.q = Eigen::Quaterniond(0,0,0,0);
 
     std::vector<Sophus::SE3d> posesLeftImage = map_left.getCumPoses();

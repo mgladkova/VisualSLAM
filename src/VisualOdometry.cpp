@@ -163,7 +163,7 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d,
     cv::eigen2cv(K, cameraMatrix);
 
     std::vector<int> inliers;
-    bool result=cv::solvePnPRansac(p3d,p2d_PrevFrame,cameraMatrix, distCoeffs,rvec,tvec, false, 200, 3.0, 0.99, inliers);
+    bool result=cv::solvePnPRansac(p3d,p2d_PrevFrame,cameraMatrix, distCoeffs,rvec,tvec, false, 100, 4.0, 0.99, inliers);
 
     if (result){
         cv::Rodrigues(rvec, rot_matrix);
@@ -184,8 +184,6 @@ void VisualOdometry::estimatePose3D2D(std::vector<cv::Point3f>& p3d,
         if (!indices.empty()){
             std::vector<int>::iterator it_2D_indices = indices.begin() + inliers[i];
             indices_filtered.push_back(*it_2D_indices);
-        } else {
-            indices_filtered = inliers;
         }
 
         p3d_filtered.push_back(*it_3D);

@@ -27,11 +27,13 @@ private:
 
     int offset;
 
+    void updateCumulativePose(Sophus::SE3d newTransform);
+    void updateCameraIndex();
+
 public:
 	Map();
     void addPoints3D(std::vector<cv::Point3f> points3D);
     void addObservations(std::vector<int> indices, std::vector<cv::Point2f> observedPoints);
-    void updateCumulativePose(Sophus::SE3d newTransform);
     void updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera);
     void setCameraPose(const int i, const Sophus::SE3d newPose);
 
@@ -44,7 +46,6 @@ public:
     void updateDataCurrentFrame(Sophus::SE3d pose, std::vector<cv::Point2f> trackedCurrFramePoints, std::vector<int> trackedPointIndices, std::vector<cv::Point3f> points3DCurrentFrame, bool addPoints);
 
     int getCurrentCameraIndex() const;
-    void updateCameraIndex();
 
     void writeBAFile(std::string fileName, int keyFrameStep, int numCameras);
 };
