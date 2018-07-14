@@ -78,10 +78,22 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map, int keyFrameStep, int numK
 
     ceres::Problem problem;
     ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
+    std::vector<cv::Point3f> structure3D = map.getStructure3D();
+    std::vector<Sophus::SE3d> cameraCumPoses = map.getCumPoses();
+
+    if (structure3D.empty()){
+        throw std::runtime_error("performBAWithKeyFrames() : Empty structure 3D vector");
+    }
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
         for (int j = 0; j < observations[i].size(); j++){
             // x and y coordinates of each observed point are stored consecutively
+            cv::Point3f p = structure3D[observations[i][j].first];
+            Eigen::Vector3d point(p.x, p.y, p.z);
+            point = cameraCumPoses[i]*point;
+            if (point[2] <= 0){
+                continue;
+            }
             ceres::CostFunction* cost_fun = ReprojectionError::Create(observations[i][j].second.x, observations[i][j].second.y);
             int pointIndex = std::distance(uniquePointIndices.begin(), uniquePointIndices.find(observations[i][j].first));
             int cameraIndex = (i - startFrame) / keyFrameStep;

@@ -62,10 +62,16 @@ void Viewer::drawConnections(Sophus::SE3d cameraPose, std::vector<int> obsIndice
             continue;
         }
 
-        //std::cout << "POINT INDEX " << pointIndex << " seen by camera at " << structure3d[pointIndex] << std::endl;
+        Eigen::Vector3d point(structure3d[pointIndex].x, structure3d[pointIndex].y, structure3d[pointIndex].z);
 
-        glVertex3f((GLfloat) cameraPose.inverse().translation()[0],(GLfloat) cameraPose.inverse().translation()[1], (GLfloat) cameraPose.inverse().translation()[2]);
-        glVertex3f((GLfloat) structure3d[pointIndex].x,(GLfloat) structure3d[pointIndex].y, (GLfloat) structure3d[pointIndex].z);
+        point = cameraPose*point;
+
+        if (point[2] > 0){
+            glVertex3f((GLfloat) cameraPose.inverse().translation()[0],(GLfloat) cameraPose.inverse().translation()[1], (GLfloat) cameraPose.inverse().translation()[2]);
+            glVertex3f((GLfloat) structure3d[pointIndex].x,(GLfloat) structure3d[pointIndex].y, (GLfloat) structure3d[pointIndex].z);
+        }
+        //std::cout << "POINT INDEX " << pointIndex << " seen by camera at " << point[0]  << " " << point[1]  << " " << point[2]  << std::endl;
+
     }
     glEnd();
 }
