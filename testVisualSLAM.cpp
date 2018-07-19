@@ -72,8 +72,8 @@ int main(int argc, char** argv){
     Viewer* viewer = new Viewer(slam);
     std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
 
-    int keyFrameStep = 1;
-    int numKeyFrames = 10;
+    int keyFrameStep = 2;
+    int numKeyFrames = 20;
     Eigen::Vector3d translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight;
 
     for (int i = 0; i < num_images; i++){
@@ -84,6 +84,7 @@ int main(int argc, char** argv){
         plot2DPoints(images_right[i], pointsCurrentFrame_right);
 
         if (i % (keyFrameStep*numKeyFrames) == 0 && i > 0){
+        //if (i >= (keyFrameStep*numKeyFrames)){
             if (slam.performPoseGraphOptimization(keyFrameStep, numKeyFrames)){
                 std::cout << "Pose Graph is SUCCESSFULL!" << std::endl;
             }
@@ -99,7 +100,8 @@ int main(int argc, char** argv){
             if (i == 0){
                 Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
                 plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, groundTruthPoses[i], groundTruthPrevPose, pose_left, pose_right, pose_left, pose_right);
-            } else if (i % keyFrameStep*numKeyFrames == 0){
+           //} else if (i >= (keyFrameStep*numKeyFrames)){
+           } else if (i % keyFrameStep*numKeyFrames == 0){
                 std::vector<Sophus::SE3d> cumPosesRight = slam.getPoses_right();
                 std::vector<Sophus::SE3d> cumPosesLeft = slam.getPoses_left();
                 replotTrajectory(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, cumPosesLeft, cumPosesRight, groundTruthPoses);

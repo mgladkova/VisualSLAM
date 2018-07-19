@@ -156,12 +156,11 @@ bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right,
     ceres::LocalParameterization* quaternion_local_parameterization =
         new ceres::EigenQuaternionParameterization;
 
-    double confid = 1e-5;
-    Eigen::Matrix<double, 6, 6> information_matrix = Eigen::MatrixXd::Identity(6, 6)*confid;
-    Pose3d constraint;
+    double confid_stereo = 1e1, confid_seq = 1e1;
+    Eigen::Matrix<double, 6, 6> information_matrix_stereo = Eigen::MatrixXd::Identity(6, 6)*confid_stereo;
+    Eigen::Matrix<double, 6, 6> information_matrix_seq = Eigen::MatrixXd::Identity(6, 6)*confid_seq;
+
     double baseline = 0.53716;
-    constraint.p = Eigen::Vector3d(0, baseline, 0);
-    constraint.q = Eigen::Quaterniond(0,0,0,0);
 
     std::vector<Sophus::SE3d> posesLeftImage = map_left.getCumPoses();
     std::vector<Sophus::SE3d> posesRightImage = map_right.getCumPoses();
@@ -173,8 +172,12 @@ bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right,
             throw std::runtime_error("performPoseGraphOptimization() : Pose index out of bounds");
         }
 
+        Pose3d constraint;
+        constraint.p = Eigen::Vector3d(baseline, 0, 0);
+        constraint.q = Eigen::Quaterniond(0,0,0,0);
+
         ceres::CostFunction* cost_function =
-                PoseGraph3dErrorTerm::Create(constraint, information_matrix);
+                PoseGraph3dErrorTerm::Create(constraint, information_matrix_stereo);
 
         problem.AddResidualBlock(cost_function, loss_function,
                                   posesLeftImage[i].translation().data(),
@@ -186,6 +189,43 @@ bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right,
                                      quaternion_local_parameterization);
         problem.SetParameterization(posesRightImage[i].so3().unit_quaternion().matrix().data(),
                                      quaternion_local_parameterization);
+    }
+
+    for (int i = startFrame; i < currentCameraIndex - keyFrameStep; i+= keyFrameStep){
+        Sophus::SE3d relPose = posesLeftImage[i].inverse()*posesLeftImage[i + keyFrameStep];
+        Eigen::Quaterniond q = relPose.unit_quaternion();
+        Pose3d constraint;
+        constraint.p = relPose.translation();
+        constraint.q = q;
+
+
+        ceres::CostFunction* cost_function =
+                PoseGraph3dErrorTerm::Create(constraint, information_matrix_seq);
+
+        problem.AddResidualBlock(cost_function, loss_function,
+                                  posesLeftImage[i].translation().data(),
+                                  posesLeftImage[i].so3().unit_quaternion().matrix().data(),
+                                  posesLeftImage[i + keyFrameStep].translation().data(),
+                                  posesLeftImage[i + keyFrameStep].so3().unit_quaternion().matrix().data());
+    }
+
+
+    for (int i = startFrame; i < currentCameraIndex - keyFrameStep; i+= keyFrameStep){
+        Sophus::SE3d relPose = posesRightImage[i].inverse()*posesRightImage[i + keyFrameStep];
+        Eigen::Quaterniond q = relPose.unit_quaternion();
+        Pose3d constraint;
+        constraint.p = relPose.translation();
+        constraint.q = q;
+
+
+        ceres::CostFunction* cost_function =
+                PoseGraph3dErrorTerm::Create(constraint, information_matrix_seq);
+
+        problem.AddResidualBlock(cost_function, loss_function,
+                                  posesRightImage[i].translation().data(),
+                                  posesRightImage[i].so3().unit_quaternion().matrix().data(),
+                                  posesRightImage[i + keyFrameStep].translation().data(),
+                                  posesRightImage[i + keyFrameStep].so3().unit_quaternion().matrix().data());
     }
 
     problem.SetParameterBlockConstant(posesLeftImage[startFrame].translation().data());
