@@ -54,7 +54,7 @@ public:
     Sophus::SE3d performFrontEndStep(cv::Mat image_left, cv::Mat disparity_map, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame); // feature detection / tracking and matching
     Sophus::SE3d performFrontEndStepWithTracking(cv::Mat image_left, cv::Mat disparity_map, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPrevFrame, cv::Mat& prevImageLeft, bool isLeftImage);
 
-    bool performPoseGraphOptimization(int keyFrameStep, int numKeyFrames);
+    //bool performPoseGraphOptimization(int keyFrameStep, int numKeyFrames);
 
     bool checkPoint2DCoordinates(cv::Point2f point, cv::Mat image);
 };

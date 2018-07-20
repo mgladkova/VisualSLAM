@@ -121,24 +121,27 @@ cv::Mat VisualSLAM::getDisparityMap(const cv::Mat image_left, const cv::Mat imag
     sgbm->setSubPixelInterpolationMethod(cv::stereo::CV_SIMETRICV_INTERPOLATION);
 
     // setting the penalties for sgbm
-    ROI = computeROIDisparityMap(image_left.size(),sgbm);
+    /*ROI = computeROIDisparityMap(image_left.size(),sgbm);
     cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
     wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
-    wls_filter->setDepthDiscontinuityRadius(2);
+    wls_filter->setDepthDiscontinuityRadius(2);*/
 
     sgbm->compute(image_left, image_right, disparity);
-    wls_filter->setLambda(8000.0);
-    wls_filter->setSigmaColor(1.5);
-    wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
+    //wls_filter->setLambda(8000.0);
+    //wls_filter->setSigmaColor(1.5);
+    //wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
 
-    cv::Mat filtered_disp_vis;
-    cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
+    //cv::Mat filtered_disp_vis;
+    //cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
     /*
     cv::namedWindow("filtered disparity", cv::WINDOW_AUTOSIZE);
     cv::imshow("filtered disparity", filtered_disp_vis);
     cv::waitKey();
     */
-    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
+    //filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
+    //return true_dmap;
+
+    disparity.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
     return true_dmap;
 }
 
@@ -246,7 +249,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat dispari
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat disparity_map, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImage, bool isLeftImage){
-    int max_features = 1500;
+    int max_features = 800;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
     cv::Size subPixWinSize(10,10);
 
@@ -307,8 +310,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     //VO.estimatePose2D2D(pointsPreviousFrame, pointsCurrentFrame, K, pose);
     VO.estimatePose3D2D(trackedPoints3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints,  trackedPointIndices, K, pose);
 
-    int keyFrameStep = 1;
-    int numKeyFrames = 10;
+    int keyFrameStep = 2;
+    int numKeyFrames = 25;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -355,19 +358,19 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
         map_left.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
 
         //if ((map_left.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
-        if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
+        /*if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
             std::string fileName = "BAFile" + std::to_string(map_left.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "L.txt";
             map_left.writeBAFile(fileName, keyFrameStep, numKeyFrames);
             BA.performBAWithKeyFrames(map_left, keyFrameStep, numKeyFrames);
-        }
+        }*/
     } else {
         map_right.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
 
         //if ((map_right.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
         if ((map_right.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_right.getCurrentCameraIndex() > 0){
             std::string fileName = "BAFile" + std::to_string(map_right.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "R.txt";
-            map_right.writeBAFile(fileName, keyFrameStep, numKeyFrames);
-            BA.performBAWithKeyFrames(map_right, keyFrameStep, numKeyFrames);
+            //map_right.writeBAFile(fileName, keyFrameStep, numKeyFrames);
+            BA.performBAWithKeyFrames(map_left, map_right, keyFrameStep, numKeyFrames);
         }
     }
 
@@ -378,9 +381,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     return pose;
 }
 
-bool VisualSLAM::performPoseGraphOptimization(int keyFrameStep, int numKeyFrames){
+/*bool VisualSLAM::performPoseGraphOptimization(int keyFrameStep, int numKeyFrames){
     if (map_left.getCurrentCameraIndex() != map_right.getCurrentCameraIndex()){
         throw std::runtime_error("VisualSLAM::performPoseGraphOptimization() : cannot perform pose graph on non-synchronized stereo data!");
     }
     return BA.performPoseGraphOptimization(map_left, map_right, keyFrameStep, numKeyFrames);
-}
+}*/

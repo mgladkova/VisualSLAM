@@ -1,5 +1,5 @@
 #include "BundleAdjuster.h"
-#include "PoseGraph3dErrorTerm.h"
+//#include "PoseGraph3dErrorTerm.h"
 
 BundleAdjuster::BundleAdjuster() {}
 
@@ -52,88 +52,122 @@ void BundleAdjuster::prepareDataForBA(Map& map, int startFrame, int currentCamer
     }
 }
 
-bool BundleAdjuster::performBAWithKeyFrames(Map& map, int keyFrameStep, int numKeyFrames){
-    int currentCameraIndex = map.getCurrentCameraIndex();
+bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int keyFrameStep, int numKeyFrames){
+    int currentCameraIndex = map_left.getCurrentCameraIndex();
+    if (currentCameraIndex != map_right.getCurrentCameraIndex()){
+        throw std::runtime_error("performBAWithKeyFrames() : unequal number of camera pose estimations for left and right cameras");
+    }
+
     int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
 
     if (startFrame < 0){
         throw std::runtime_error("prepareDataForBA() : Start frame index out of bounds!");
     }
 
-    std::set<int> uniquePointIndices;
-    std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = map.getObservations();
+    std::set<int> uniquePointIndices_left, uniquePointIndices_right;
+    std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations_left = map_left.getObservations();
+    std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations_right = map_right.getObservations();
 
     std::cout << "START FRAME: " << startFrame << std::endl;
 
     for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
-        for (int j = 0; j < observations[i].size(); j++){
-            uniquePointIndices.insert(observations[i][j].first);
+        for (int j = 0; j < observations_left[i].size(); j++){
+            uniquePointIndices_left.insert(observations_left[i][j].first);
         }
     }
 
-    double points3DArray[3*uniquePointIndices.size()];
-    double cameraPose[7*numKeyFrames];
+    for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
+        for (int j = 0; j < observations_right[i].size(); j++){
+            uniquePointIndices_right.insert(observations_right[i][j].first);
+        }
+    }
 
-    prepareDataForBA(map, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices, points3DArray, cameraPose);
+    double points3DArray_left[3*uniquePointIndices_left.size()];
+    double cameraPose_left[7*numKeyFrames];
+    double points3DArray_right[3*uniquePointIndices_right.size()];
+    double cameraPose_right[7*numKeyFrames];
+
+    prepareDataForBA(map_left, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices_left, points3DArray_left, cameraPose_left);
+    prepareDataForBA(map_right, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices_right, points3DArray_right, cameraPose_right);
 
     ceres::Problem problem;
     ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
-    std::vector<cv::Point3f> structure3D = map.getStructure3D();
-    std::vector<Sophus::SE3d> cameraCumPoses = map.getCumPoses();
-
-    if (structure3D.empty()){
-        throw std::runtime_error("performBAWithKeyFrames() : Empty structure 3D vector");
-    }
+    double baseline = 0.53716;
+    double confid = 1e4;
+    Eigen::Matrix<double, 6, 6> information_matrix = Eigen::MatrixXd::Identity(6, 6)*confid;
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
-        for (int j = 0; j < observations[i].size(); j++){
-            // x and y coordinates of each observed point are stored consecutively
-            cv::Point3f p = structure3D[observations[i][j].first];
-            Eigen::Vector3d point(p.x, p.y, p.z);
-            point = cameraCumPoses[i]*point;
-            if (point[2] <= 0){
-                continue;
-            }
-            ceres::CostFunction* cost_fun = ReprojectionError::Create(observations[i][j].second.x, observations[i][j].second.y);
-            int pointIndex = std::distance(uniquePointIndices.begin(), uniquePointIndices.find(observations[i][j].first));
+        for (int j = 0; j < observations_left[i].size(); j++){
+            Pose3d constraint;
+            constraint.p = Eigen::Vector3d(baseline, 0, 0);
+            constraint.q = Eigen::Quaterniond(0,0,0,0);
+
+            ceres::CostFunction* cost_fun = ReprojectionError::Create(observations_left[i][j].second.x, observations_left[i][j].second.y,
+                                                                      constraint, information_matrix);
+            int pointIndex = std::distance(uniquePointIndices_left.begin(), uniquePointIndices_left.find(observations_left[i][j].first));
             int cameraIndex = (i - startFrame) / keyFrameStep;
 
-            problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose[7*cameraIndex]), &(points3DArray[3*pointIndex]));
+            problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose_left[7*cameraIndex]), &(cameraPose_right[7*cameraIndex]),
+                                                              &(points3DArray_left[3*pointIndex]));
+        }
+
+        for (int j = 0; j < observations_right[i].size(); j++){
+            Pose3d constraint;
+            constraint.p = Eigen::Vector3d(-baseline, 0, 0);
+            constraint.q = Eigen::Quaterniond(0,0,0,0);
+
+            ceres::CostFunction* cost_fun = ReprojectionError::Create(observations_right[i][j].second.x, observations_right[i][j].second.y,
+                                                                      constraint, information_matrix);
+            int pointIndex = std::distance(uniquePointIndices_right.begin(), uniquePointIndices_right.find(observations_right[i][j].first));
+            int cameraIndex = (i - startFrame) / keyFrameStep;
+
+            problem.AddResidualBlock(cost_fun, loss_function, &(cameraPose_right[7*cameraIndex]), &(cameraPose_left[7*cameraIndex]),
+                                                              &(points3DArray_right[3*pointIndex]));
         }
     }
 
-    problem.SetParameterBlockConstant(cameraPose);
-    int lastCameraIndex = (currentCameraIndex - startFrame - 1) / keyFrameStep;
-    problem.SetParameterBlockConstant(&cameraPose[7*lastCameraIndex]);
+    problem.SetParameterBlockConstant(cameraPose_left);
+    problem.SetParameterBlockConstant(cameraPose_right);
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
-    options.minimizer_progress_to_stdout = false;
-    options.max_num_iterations = 200;
-    options.function_tolerance = 1e-5;
-    options.dense_linear_algebra_library_type = ceres::LAPACK;
+    options.minimizer_progress_to_stdout = true;
+    //options.max_num_iterations = 200;
+    //options.function_tolerance = 1e-5;
+    //options.dense_linear_algebra_library_type = ceres::LAPACK;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
 
     if (summary.IsSolutionUsable()){
-        Sophus::SE3d firstFrame = map.getCumPoseAt(startFrame);
-        map.updatePoints3D(uniquePointIndices, points3DArray, firstFrame);
+        Sophus::SE3d firstFrame_left = map_left.getCumPoseAt(startFrame);
+        map_left.updatePoints3D(uniquePointIndices_left, points3DArray_left, firstFrame_left);
+
+        Sophus::SE3d firstFrame_right = map_right.getCumPoseAt(startFrame);
+        map_right.updatePoints3D(uniquePointIndices_right, points3DArray_right, firstFrame_right);
 
         for (int i = startFrame; i < currentCameraIndex; i+=keyFrameStep){
             int cameraIndex = (i - startFrame) / keyFrameStep;
-            Eigen::Quaterniond q(cameraPose[7*cameraIndex], cameraPose[7*cameraIndex + 1], cameraPose[7*cameraIndex + 2], cameraPose[7*cameraIndex + 3]);
-            Eigen::Vector3d t(cameraPose[7*cameraIndex + 4], cameraPose[7*cameraIndex + 5], cameraPose[7*cameraIndex + 6]);
+            Eigen::Quaterniond q_left(cameraPose_left[7*cameraIndex], cameraPose_left[7*cameraIndex + 1], cameraPose_left[7*cameraIndex + 2], cameraPose_left[7*cameraIndex + 3]);
+            Eigen::Vector3d t_left(cameraPose_left[7*cameraIndex + 4], cameraPose_left[7*cameraIndex + 5], cameraPose_left[7*cameraIndex + 6]);
 
-            Sophus::SE3d newPose(q.normalized().toRotationMatrix(), t);
+            Sophus::SE3d newPose_left(q_left.normalized().toRotationMatrix(), t_left);
 
+            Eigen::Quaterniond q_right(cameraPose_right[7*cameraIndex], cameraPose_right[7*cameraIndex + 1], cameraPose_right[7*cameraIndex + 2], cameraPose_right[7*cameraIndex + 3]);
+            Eigen::Vector3d t_right(cameraPose_right[7*cameraIndex + 4], cameraPose_right[7*cameraIndex + 5], cameraPose_right[7*cameraIndex + 6]);
+
+            Sophus::SE3d newPose_right(q_right.normalized().toRotationMatrix(), t_right);
             //newPose = newPose*firstFrame;
             //std::cout << "Old pose " << i << " : " << map.getCumPoseAt(i).matrix() << std::endl;
 
             int MAX_POSE_NORM = 100;
-            if (newPose.log().norm() <= MAX_POSE_NORM){
-                map.setCameraPose(i, newPose);
+            if (newPose_left.log().norm() <= MAX_POSE_NORM){
+                map_left.setCameraPose(i, newPose_left);
+            }
+
+            if (newPose_right.log().norm() <= MAX_POSE_NORM){
+                map_right.setCameraPose(i, newPose_right);
             }
 
             //std::cout << "New pose " << i << " : " << map.getCumPoseAt(i).matrix()  << std::endl;
@@ -144,7 +178,7 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map, int keyFrameStep, int numK
     return summary.IsSolutionUsable();
 }
 
-bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right, int keyFrameStep, int numKeyFrames) {
+/*bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right, int keyFrameStep, int numKeyFrames) {
     int currentCameraIndex = map_left.getCurrentCameraIndex();
     int startFrame = currentCameraIndex - keyFrameStep*numKeyFrames;
 
@@ -256,4 +290,4 @@ bool BundleAdjuster::performPoseGraphOptimization(Map& map_left, Map& map_right,
     }
 
     return summary.IsSolutionUsable();
-}
+}*/
