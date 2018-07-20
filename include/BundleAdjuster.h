@@ -44,7 +44,7 @@ private:
     // The measurement for the position of B relative to A in the A frame.
     Pose3d t_ab_measured;
     // The square root of the measurement information matrix.
-    Eigen::Matrix<double, 6, 6> sqrt_information;
+    Eigen::Matrix<double, 7, 7> sqrt_information;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -52,7 +52,7 @@ public:
     ReprojectionError(double observ_x_new,
                       double observ_y_new,
                       Pose3d t_ab_measured,
-                      Eigen::Matrix<double, 6, 6> sqrt_information):observ_x(observ_x_new),
+                      Eigen::Matrix<double, 7, 7> sqrt_information):observ_x(observ_x_new),
                                                                     observ_y(observ_y_new),
                                                                     t_ab_measured(t_ab_measured),
                                                                     sqrt_information(sqrt_information){}
@@ -110,9 +110,10 @@ public:
         residuals[2] = sqrt_information(0,0)*(p_ab_estimated[0] - t_ab_measured.p.template cast<T>()[0]);
         residuals[3] = sqrt_information(1,1)*(p_ab_estimated[1] - t_ab_measured.p.template cast<T>()[1]);
         residuals[4] = sqrt_information(2,2)*(p_ab_estimated[2] - t_ab_measured.p.template cast<T>()[2]);
-        residuals[5] = sqrt_information(3,3)*(T(2.0) * delta_q.vec()[0]);
-        residuals[6] = sqrt_information(4,4)*(T(2.0) * delta_q.vec()[1]);
-        residuals[7] = sqrt_information(5,5)*(T(2.0) * delta_q.vec()[2]);
+        residuals[5] = sqrt_information(3,3)*(T(2.0) * delta_q.w());
+        residuals[6] = sqrt_information(4,4)*(T(2.0) * delta_q.x());
+        residuals[7] = sqrt_information(5,5)*(T(2.0) * delta_q.y());
+        residuals[8] = sqrt_information(6,6)*(T(2.0) * delta_q.z());
 
         return true;
 
@@ -120,8 +121,8 @@ public:
 
     static ceres::CostFunction* Create(double observ_x_new, double observ_y_new,
                                        Pose3d t_ab_measured,
-                                       Eigen::Matrix<double, 6, 6> sqrt_information){
-        ceres::CostFunction* cost_fun = new ceres::AutoDiffCostFunction<ReprojectionError, 8, 7, 7, 3>
+                                       Eigen::Matrix<double, 7, 7> sqrt_information){
+        ceres::CostFunction* cost_fun = new ceres::AutoDiffCostFunction<ReprojectionError, 9, 7, 7, 3>
         (new ReprojectionError(observ_x_new, observ_y_new, t_ab_measured, sqrt_information));
         return cost_fun;
     }

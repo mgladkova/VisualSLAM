@@ -103,7 +103,7 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
 
         Eigen::Vector3d v(points3DArray[3*k], points3DArray[3*k + 1], points3DArray[3*k + 2]);
         //v = firstCamera.inverse()*v;
-        if (v[2] > 0 && v[2] < 1000){
+        if (v[2] > 0){
             structure3D[i] = cv::Point3f(v[0], v[1], v[2]);
         }
         k++;

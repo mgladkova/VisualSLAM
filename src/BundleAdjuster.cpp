@@ -93,8 +93,8 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     ceres::Problem problem;
     ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
     double baseline = 0.53716;
-    double confid = 1e4;
-    Eigen::Matrix<double, 6, 6> information_matrix = Eigen::MatrixXd::Identity(6, 6)*confid;
+    double confid = 1e2;
+    Eigen::Matrix<double, 7, 7> information_matrix = Eigen::MatrixXd::Identity(7, 7)*confid;
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){
         for (int j = 0; j < observations_left[i].size(); j++){
@@ -132,9 +132,9 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = true;
-    //options.max_num_iterations = 200;
+    options.max_num_iterations = 200;
     //options.function_tolerance = 1e-5;
-    //options.dense_linear_algebra_library_type = ceres::LAPACK;
+    options.dense_linear_algebra_library_type = ceres::LAPACK;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);

@@ -249,7 +249,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat dispari
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat disparity_map, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImage, bool isLeftImage){
-    int max_features = 800;
+    int max_features = 700;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
     cv::Size subPixWinSize(10,10);
 
@@ -311,7 +311,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     VO.estimatePose3D2D(trackedPoints3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints,  trackedPointIndices, K, pose);
 
     int keyFrameStep = 2;
-    int numKeyFrames = 25;
+    int numKeyFrames = 15;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
