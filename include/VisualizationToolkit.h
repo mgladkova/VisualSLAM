@@ -14,21 +14,45 @@
 #include <opencv2/core/eigen.hpp>
 
 #include <unistd.h>
+#include <mutex>
+#include <condition_variable>
 
-void computeAndShowPointCloud(const cv::Mat image_left, const cv::Mat disparity, const float baseline, Eigen::Matrix3d K);
-void visualizeAllPoses(std::vector<Sophus::SE3d> historyPoses, Eigen::Matrix3d K);
-void plot2DPoints(cv::Mat image, std::vector<cv::Point2f> points2d);
-void plot2DPoints(cv::Mat image, std::vector<cv::KeyPoint> keypoints);
-void plotTrajectoryNextStep(cv::Mat& window, int index,
-                            Eigen::Vector3d& translGTAccumulated,
-                            Eigen::Vector3d& translEstimAccumulatedLeft,
-                            Eigen::Vector3d& translEstimAccumulatedRight,
-                            Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose,
-                            Sophus::SE3d estimPoseLeft, Sophus::SE3d estimPoseRight,
-                            Sophus::SE3d estimPrevPoseLeft, Sophus::SE3d estimPrevPoseRight);
+class VisualizationToolkit{
+  public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-void replotTrajectory(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated,
-                      Eigen::Vector3d& translEstimAccumulatedLeft, Eigen::Vector3d& translEstimAccumulatedRight,
-                      std::vector<Sophus::SE3d> cumPosesLeft, std::vector<Sophus::SE3d> cumPosesRight,
-                      std::vector<Sophus::SE3d> groundTruthPoses);
-void showPointCloud(const std::vector<cv::Point3f> points3D);
+    VisualizationToolkit(Eigen::Matrix3d calibMat, float baseline);
+    void computeAndShowPointCloud();
+    void getDataForPointCloudVisualization(cv::Mat& image_left, cv::Mat& disparity);
+    void setDataForPointCloudVisualization(cv::Mat image_left, cv::Mat disparity);
+    void visualizeAllPoses(std::vector<Sophus::SE3d> historyPoses, Eigen::Matrix3d K);
+    void plot2DPoints(cv::Mat image, std::vector<cv::Point2f> points2d);
+    void plot2DPoints(cv::Mat image, std::vector<cv::KeyPoint> keypoints);
+    void plotTrajectoryNextStep(cv::Mat& window, int index,
+                                Eigen::Vector3d& translGTAccumulated,
+                                Eigen::Vector3d& translEstimAccumulatedLeft,
+                                Eigen::Vector3d& translEstimAccumulatedRight,
+                                Sophus::SE3d groundTruthPose, Sophus::SE3d groundTruthPrevPose,
+                                Sophus::SE3d estimPoseLeft, Sophus::SE3d estimPoseRight,
+                                Sophus::SE3d estimPrevPoseLeft, Sophus::SE3d estimPrevPoseRight);
+
+    void replotTrajectory(cv::Mat& window, int index, Eigen::Vector3d& translGTAccumulated,
+                          Eigen::Vector3d& translEstimAccumulatedLeft, Eigen::Vector3d& translEstimAccumulatedRight,
+                          std::vector<Sophus::SE3d> cumPosesLeft, std::vector<Sophus::SE3d> cumPosesRight,
+                          std::vector<Sophus::SE3d> groundTruthPoses);
+    void showPointCloud(const std::vector<cv::Point3f> points3D);
+private:
+    Eigen::Matrix3d K;
+    float baseline;
+
+    cv::Mat image;
+    cv::Mat disparity;
+
+    std::mutex mReadWriteMutex;
+    std::condition_variable mCondVar;
+
+    bool mReadyToProcess;
+    bool mProcessed;
+};
+
+

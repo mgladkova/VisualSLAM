@@ -68,7 +68,7 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations_left = map_left.getObservations();
     std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations_right = map_right.getObservations();
 
-    std::cout << "START FRAME: " << startFrame << std::endl;
+    //std::cout << "START FRAME: " << startFrame << std::endl;
 
     for (int i = startFrame; i < currentCameraIndex; i+= keyFrameStep){
         for (int j = 0; j < observations_left[i].size(); j++){
@@ -91,7 +91,7 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     prepareDataForBA(map_right, startFrame, currentCameraIndex, keyFrameStep, uniquePointIndices_right, points3DArray_right, cameraPose_right);
 
     ceres::Problem problem;
-    ceres::LossFunction* loss_function = new ceres::HuberLoss(1.0);
+    ceres::LossFunction* loss_function = new ceres::HuberLoss(2.0);
     double baseline = 0.53716;
     double confid = 1e2;
     Eigen::Matrix<double, 7, 7> information_matrix = Eigen::MatrixXd::Identity(7, 7)*confid;
@@ -133,7 +133,7 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = true;
     options.max_num_iterations = 200;
-    //options.function_tolerance = 1e-5;
+    options.function_tolerance = 1e-5;
     options.dense_linear_algebra_library_type = ceres::LAPACK;
 
     ceres::Solver::Summary summary;

@@ -29,11 +29,12 @@ void Viewer::run(){
         glClearColor(0.0f,0.0f,0.0f,0.0f);
 
         int cameraIndex;
+
         Sophus::SE3d camera, gtCamera;
         std::vector<cv::Point3f> structure3d;
         std::vector<int> obsIndices;
 
-        mSlam->getDataFromImageLeftForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
+        mSlam->getDataFromImageRightForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
 
         drawPose(camera);
         drawPose(gtCamera);

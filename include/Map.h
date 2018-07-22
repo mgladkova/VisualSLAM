@@ -20,6 +20,7 @@ private:
     std::vector<cv::Point3f> structure3D;
     int currentCameraIndex;
     std::mutex mReadWriteMutex;
+    std::mutex mReadWriteMutex2;
     std::condition_variable mCondVar;
 
     bool mReadyToProcess;
@@ -37,15 +38,16 @@ public:
     void updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera);
     void setCameraPose(const int i, const Sophus::SE3d newPose);
 
-    std::vector<cv::Point3f> getStructure3D() const;
-    std::map<int, std::vector<std::pair<int, cv::Point2f>>> getObservations() const;
-    std::vector<Sophus::SE3d> getCumPoses() const;
-    Sophus::SE3d getCumPoseAt(int index) const;
+    std::vector<cv::Point3f> getStructure3D();
+    std::map<int, std::vector<std::pair<int, cv::Point2f>>> getObservations();
+    std::vector<Sophus::SE3d> getCumPoses();
+    Sophus::SE3d getCumPoseAt(int index);
 
     void getDataForDrawing(int& cameraIndex, Sophus::SE3d& camera, std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices, Sophus::SE3d& gtCamera);
-    void updateDataCurrentFrame(Sophus::SE3d pose, std::vector<cv::Point2f> trackedCurrFramePoints, std::vector<int> trackedPointIndices, std::vector<cv::Point3f> points3DCurrentFrame, bool addPoints);
+    void updateDataCurrentFrame(Sophus::SE3d pose, std::vector<cv::Point2f> trackedCurrFramePoints, std::vector<int> trackedPointIndices, std::vector<cv::Point3f> points3DCurrentFrame, 
+				bool addPoints, bool rightCamera);
 
-    int getCurrentCameraIndex() const;
+    int getCurrentCameraIndex();
 
     void writeBAFile(std::string fileName, int keyFrameStep, int numCameras);
 };

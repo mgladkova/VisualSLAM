@@ -71,6 +71,9 @@ int main(int argc, char** argv){
 
     Viewer* viewer = new Viewer(slam);
     std::thread* viewerThread = new std::thread(&Viewer::run, viewer);
+    float baseline = 0.53716;
+    VisualizationToolkit* visToolkit = new VisualizationToolkit(slam.getCameraMatrix(), baseline);
+    //std::thread* disparityThread = new std::thread(&VisualizationToolkit::computeAndShowPointCloud, visToolkit);
 
     int keyFrameStep = 1;
     int numKeyFrames = 10;
@@ -81,7 +84,9 @@ int main(int argc, char** argv){
 
         Sophus::SE3d pose_left = slam.performFrontEndStepWithTracking(images_left[i], disparity_map, pointsCurrentFrame_left, pointsPrevFrame_left, prevImageLeft, true);
         Sophus::SE3d pose_right = slam.performFrontEndStepWithTracking(images_right[i], disparity_map, pointsCurrentFrame_right, pointsPrevFrame_right, prevImageRight, false);
-        plot2DPoints(images_right[i], pointsCurrentFrame_right);
+        visToolkit->plot2DPoints(images_right[i], pointsCurrentFrame_right);
+
+        visToolkit->setDataForPointCloudVisualization(images_left[i], disparity_map);
 
         /*if (i % (keyFrameStep*numKeyFrames) == 0 && i > 0){
         //if (i >= (keyFrameStep*numKeyFrames)){
@@ -99,17 +104,17 @@ int main(int argc, char** argv){
         if (!groundTruthPoses.empty() && i < groundTruthPoses.size()){
             if (i == 0){
                 Sophus::SE3d groundTruthPrevPose = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0,0,0));
-                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, groundTruthPoses[i], groundTruthPrevPose, pose_left, pose_right, pose_left, pose_right);
+                visToolkit->plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, groundTruthPoses[i], groundTruthPrevPose, pose_left, pose_right, pose_left, pose_right);
            //} else if (i >= (keyFrameStep*numKeyFrames)){
            } else if (i % (keyFrameStep*numKeyFrames) == 0){
                 std::vector<Sophus::SE3d> cumPosesRight = slam.getPoses_right();
                 std::vector<Sophus::SE3d> cumPosesLeft = slam.getPoses_left();
-                replotTrajectory(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, cumPosesLeft, cumPosesRight, groundTruthPoses);
+                visToolkit->replotTrajectory(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, cumPosesLeft, cumPosesRight, groundTruthPoses);
             } else {
                 std::cout << "Frame " << i << " / " << groundTruthPoses.size() << std::endl;
                 Sophus::SE3d prevCumPoseLeft = slam.getPose_left(i-1);
                 Sophus::SE3d prevCumPoseRight = slam.getPose_right(i-1);
-                plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, groundTruthPoses[i], groundTruthPoses[i-1], cumPoseLeft, cumPoseRight, prevCumPoseLeft, prevCumPoseRight);
+                visToolkit->plotTrajectoryNextStep(window, i, translGTAccumulated, translEstimAccumulatedLeft, translEstimAccumulatedRight, groundTruthPoses[i], groundTruthPoses[i-1], cumPoseLeft, cumPoseRight, prevCumPoseLeft, prevCumPoseRight);
             }
 
             cv::imshow("Trajectory", window);
@@ -118,11 +123,14 @@ int main(int argc, char** argv){
 #endif
     }
 #ifdef VIS_POSES
-    visualizeAllPoses(slam.getPoses_left(), slam.getCameraMatrix());
+    visToolkit->visualizeAllPoses(slam.getPoses_left(), slam.getCameraMatrix());
 #endif
 
     viewerThread->join();
+    //disparityThread->join();
+
     delete viewer;
+    delete visToolkit;
 
     cv::imwrite("result_trajectories.png", window);
     return 0;

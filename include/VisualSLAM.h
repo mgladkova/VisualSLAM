@@ -28,14 +28,14 @@ public:
     Sophus::SE3d getPose_right(int index);
     Sophus::SE3d getGTPose(int index) const;
 
-    std::vector<Sophus::SE3d> getPoses_left() const;
-    std::vector<Sophus::SE3d> getPoses_right() const;
+    std::vector<Sophus::SE3d> getPoses_left();
+    std::vector<Sophus::SE3d> getPoses_right();
 
-    int getNumberPoses_left() const;
-    int getNumberPoses_right() const;
+    int getNumberPoses_left();
+    int getNumberPoses_right();
 
-    std::vector<cv::Point3f> getStructure3D_left() const;
-    std::vector<cv::Point3f> getStructure3D_right() const;
+    std::vector<cv::Point3f> getStructure3D_left();
+    std::vector<cv::Point3f> getStructure3D_right();
 
     Eigen::Matrix3d getCameraMatrix() const;
     double getFocalLength() const;
@@ -47,6 +47,7 @@ public:
     cv::Rect computeROIDisparityMap(cv::Size2i src_sz, cv::Ptr<cv::stereo::StereoBinarySGBM> matcher_instance);
 
     void getDataFromImageLeftForDrawing(int& cameraIndex, Sophus::SE3d& camera, std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices, Sophus::SE3d& gtCamera);
+    void getDataFromImageRightForDrawing(int& cameraIndex, Sophus::SE3d& camera, std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices, Sophus::SE3d& gtCamera);
 
     void readCameraIntrisics(std::string camera_intrinsics_file);
     void readGroundTruthData(std::string fileName, int numberFrames, std::vector<Sophus::SE3d>& groundTruthData);

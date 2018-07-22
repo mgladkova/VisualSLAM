@@ -9,6 +9,7 @@ Map::Map() {
 
 void Map::addPoints3D(std::vector<cv::Point3f> points3D){
     // convert points from camera to world coordinate system
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     Sophus::SE3d cumPose = cumPoses[currentCameraIndex];
 
     std::cout << cumPose.matrix() << std::endl;
@@ -30,6 +31,7 @@ void Map::addPoints3D(std::vector<cv::Point3f> points3D){
 }
 
 void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> observedPoints){
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     std::vector<std::pair<int, cv::Point2f>> newObservations;
 
     assert(indices.size() == observedPoints.size());
@@ -46,6 +48,7 @@ void Map::addObservations(std::vector<int> indices, std::vector<cv::Point2f> obs
 }
 
 void Map::updateCumulativePose(Sophus::SE3d newTransform){
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     if (cumPoses.empty()){
         cumPoses.push_back(newTransform);
         return;
@@ -56,23 +59,28 @@ void Map::updateCumulativePose(Sophus::SE3d newTransform){
     cumPoses.push_back(newTransform.inverse()*cumPoses[currentCameraIndex - 1]);
 }
 
-int Map::getCurrentCameraIndex() const{
+int Map::getCurrentCameraIndex() {
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     return currentCameraIndex;
 }
 
-std::vector<cv::Point3f> Map::getStructure3D() const{
+std::vector<cv::Point3f> Map::getStructure3D() {
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     return structure3D;
 }
 
-std::map<int, std::vector<std::pair<int, cv::Point2f>>> Map::getObservations() const{
+std::map<int, std::vector<std::pair<int, cv::Point2f>>> Map::getObservations() {
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     return observations;
 }
 
-std::vector<Sophus::SE3d> Map::getCumPoses() const{
+std::vector<Sophus::SE3d> Map::getCumPoses() {
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     return cumPoses;
 }
 
-Sophus::SE3d Map::getCumPoseAt(int index) const{
+Sophus::SE3d Map::getCumPoseAt(int index) {
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     if (index < 0 || index > cumPoses.size()){
         throw std::runtime_error("getCumPoseAt() : Index out of bounds!");
     }
@@ -81,7 +89,7 @@ Sophus::SE3d Map::getCumPoseAt(int index) const{
 }
 
 void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
-    std::unique_lock<std::mutex> lock(mReadWriteMutex);
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     if (i < 0 || i >= cumPoses.size()){
         throw std::runtime_error("setCameraPose() : Index is out of bounds!");
     }
@@ -90,7 +98,7 @@ void Map::setCameraPose(const int i, const Sophus::SE3d newPose){
 }
 
 void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray, Sophus::SE3d firstCamera){
-    std::unique_lock<std::mutex> lock(mReadWriteMutex);
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     if (uniquePointIndices.empty()){
         throw std::runtime_error("updatePoints3D() : No point indices are given");
     }
@@ -111,6 +119,7 @@ void Map::updatePoints3D(std::set<int> uniquePointIndices, double* points3DArray
 }
 
 void Map::updateCameraIndex(){
+    std::unique_lock<std::mutex> lock(mReadWriteMutex2);
     currentCameraIndex = currentCameraIndex + 1;
 }
 
@@ -124,20 +133,19 @@ void Map::getDataForDrawing(int& cameraIndex,
         mCondVar.wait(lock, [this]{return mReadyToProcess;});
 
         cameraIndex = this->currentCameraIndex - 1;
-        //std::cout << "CAMERA INDEX: " << cameraIndex << std::endl;
-        camera = getCumPoseAt(cameraIndex);
-        structure3d = this->structure3D;
 
-        std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = this->observations;
+		camera = this->getCumPoseAt(cameraIndex);
+		structure3d = this->getStructure3D();
 
-        obsIndices.clear();
+		std::map<int, std::vector<std::pair<int, cv::Point2f>>> observations = this->observations;
 
-        for (int i = 0; i < observations[cameraIndex].size(); i++){
-           obsIndices.push_back(observations[cameraIndex][i].first);
-        }
+		obsIndices.clear();
 
-        gtCamera = getCumPoseAt(cameraIndex); // TO-DO change to GT data
+		for (int i = 0; i < observations[cameraIndex].size(); i++){
+		   obsIndices.push_back(observations[cameraIndex][i].first);
+		}
 
+		gtCamera = getCumPoseAt(cameraIndex); // TO-DO change to GT data
         mProcessed = true;
         //mReadyToProcess = false;
     }
@@ -149,7 +157,7 @@ void Map::updateDataCurrentFrame(Sophus::SE3d pose,
                                  std::vector<cv::Point2f> trackedCurrFramePoints,
                                  std::vector<int> trackedPointIndices,
                                  std::vector<cv::Point3f> points3DCurrentFrame,
-                                 bool addPoints){
+                                 bool addPoints, bool rightCamera){
     {
         std::unique_lock<std::mutex> lock(mReadWriteMutex);
         mCondVar.wait(lock, [this]{return mProcessed;});
@@ -177,12 +185,15 @@ void Map::updateDataCurrentFrame(Sophus::SE3d pose,
         addObservations(trackedPointIndices, trackedCurrFramePoints);
 
         updateCameraIndex();
-
-        mReadyToProcess = true;
+	if (rightCamera){    	
+		mReadyToProcess = true;
+	} else {
+		mReadyToProcess = false;	
+	}
         //mProcessed = false;
     }
-
-    mCondVar.notify_one();
+    
+	mCondVar.notify_one();
 }
 
 

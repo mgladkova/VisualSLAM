@@ -27,19 +27,19 @@ Sophus::SE3d VisualSLAM::getGTPose(int index) const{
     return groundTruthData[index];
 }
 
-std::vector<Sophus::SE3d> VisualSLAM::getPoses_left() const{
+std::vector<Sophus::SE3d> VisualSLAM::getPoses_left(){
     return map_left.getCumPoses();
 }
 
-int VisualSLAM::getNumberPoses_left() const{
+int VisualSLAM::getNumberPoses_left(){
     return map_left.getCumPoses().size();
 }
 
-std::vector<Sophus::SE3d> VisualSLAM::getPoses_right() const{
+std::vector<Sophus::SE3d> VisualSLAM::getPoses_right(){
     return map_right.getCumPoses();
 }
 
-int VisualSLAM::getNumberPoses_right() const{
+int VisualSLAM::getNumberPoses_right(){
     return map_right.getCumPoses().size();
 }
 
@@ -51,11 +51,11 @@ double VisualSLAM::getFocalLength() const {
     return (K(0,0) + K(1,1)) / 2.0;
 }
 
-std::vector<cv::Point3f> VisualSLAM::getStructure3D_left() const{
+std::vector<cv::Point3f> VisualSLAM::getStructure3D_left(){
     return map_left.getStructure3D();
 }
 
-std::vector<cv::Point3f> VisualSLAM::getStructure3D_right() const{
+std::vector<cv::Point3f> VisualSLAM::getStructure3D_right(){
     return map_right.getStructure3D();
 }
 
@@ -121,34 +121,40 @@ cv::Mat VisualSLAM::getDisparityMap(const cv::Mat image_left, const cv::Mat imag
     sgbm->setSubPixelInterpolationMethod(cv::stereo::CV_SIMETRICV_INTERPOLATION);
 
     // setting the penalties for sgbm
-    /*ROI = computeROIDisparityMap(image_left.size(),sgbm);
+    ROI = computeROIDisparityMap(image_left.size(),sgbm);
     cv::Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
     wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
-    wls_filter->setDepthDiscontinuityRadius(2);*/
+    wls_filter->setDepthDiscontinuityRadius(2);
 
     sgbm->compute(image_left, image_right, disparity);
-    //wls_filter->setLambda(8000.0);
-    //wls_filter->setSigmaColor(1.5);
-    //wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
+    wls_filter->setLambda(8000.0);
+    wls_filter->setSigmaColor(1.5);
+    wls_filter->filter(disparity,image_left,disparity_norm,cv::Mat(), ROI);
 
-    //cv::Mat filtered_disp_vis;
-    //cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
+    cv::Mat filtered_disp_vis;
+    cv::ximgproc::getDisparityVis(disparity_norm,filtered_disp_vis,1);
     /*
     cv::namedWindow("filtered disparity", cv::WINDOW_AUTOSIZE);
     cv::imshow("filtered disparity", filtered_disp_vis);
     cv::waitKey();
     */
-    //filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
-    //return true_dmap;
-
-    disparity.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
+    filtered_disp_vis.convertTo(true_dmap, CV_32F, 1.0, 0.0);
     return true_dmap;
+
+    //disparity.convertTo(true_dmap, CV_32F, 1.0/16.0, 0.0);
+    //return true_dmap;
 }
 
 void VisualSLAM::getDataFromImageLeftForDrawing(int& cameraIndex, Sophus::SE3d& camera,
                                    std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices,
                                    Sophus::SE3d& gtCamera){
     map_left.getDataForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
+}
+
+void VisualSLAM::getDataFromImageRightForDrawing(int& cameraIndex, Sophus::SE3d& camera,
+                                   std::vector<cv::Point3f>& structure3d, std::vector<int>& obsIndices,
+                                   Sophus::SE3d& gtCamera){
+    map_right.getDataForDrawing(cameraIndex, camera, structure3d, obsIndices, gtCamera);
 }
 bool VisualSLAM::checkPoint2DCoordinates(cv::Point2f point, cv::Mat image){
     return point.x >= 0 && point.x < image.cols && point.y < image.rows && point.y >= 0;
@@ -249,7 +255,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat dispari
 }
 
 Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat disparity_map, std::vector<cv::Point2f>& pointsCurrentFrame, std::vector<cv::Point2f>& pointsPreviousFrame, cv::Mat& prevImage, bool isLeftImage){
-    int max_features = 700;
+    int max_features = 800;
     cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,20,0.03);
     cv::Size subPixWinSize(10,10);
 
@@ -274,9 +280,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
         std::iota(observedPointIndices_init.begin(), observedPointIndices_init.end(), 0);
 
         if (isLeftImage){
-            map_left.updateDataCurrentFrame(pose, pointsCurrenFrame_init_f, observedPointIndices_init, points3D_init_f, true);
+            map_left.updateDataCurrentFrame(pose, pointsCurrenFrame_init_f, observedPointIndices_init, points3D_init_f, true, false);
         } else {
-            map_right.updateDataCurrentFrame(pose, pointsCurrenFrame_init_f, observedPointIndices_init, points3D_init_f, true);
+            map_right.updateDataCurrentFrame(pose, pointsCurrenFrame_init_f, observedPointIndices_init, points3D_init_f, true, true);
         }
 
 
@@ -288,7 +294,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
         return pose;
     }
 
-    int thresholdNumberFeatures = 100;
+    int thresholdNumberFeatures = 200;
     bool init = false;
     std::vector<uchar> validPoints3D;
 
@@ -310,8 +316,8 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     //VO.estimatePose2D2D(pointsPreviousFrame, pointsCurrentFrame, K, pose);
     VO.estimatePose3D2D(trackedPoints3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints,  trackedPointIndices, K, pose);
 
-    int keyFrameStep = 2;
-    int numKeyFrames = 15;
+    int keyFrameStep = 3;
+    int numKeyFrames = 20;
 
     if (init){
         std::cout << "REINITIALIZATION" << std::endl;
@@ -340,9 +346,9 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
         //trackedPointIndices.insert(trackedPointIndices.end(), indicesReinit.begin(),indicesReinit.end());
 
         if (isLeftImage){
-            map_left.updateDataCurrentFrame(pose, pointsCurrentFrame_reinit_f, indicesReinit, points3D_reinit_f, true);
+            map_left.updateDataCurrentFrame(pose, pointsCurrentFrame_reinit_f, indicesReinit, points3D_reinit_f, true, false);
         } else {
-            map_right.updateDataCurrentFrame(pose, pointsCurrentFrame_reinit_f, indicesReinit, points3D_reinit_f, true);
+            map_right.updateDataCurrentFrame(pose, pointsCurrentFrame_reinit_f, indicesReinit, points3D_reinit_f, true, true);
         }
 
         pointsPreviousFrame.clear();
@@ -355,7 +361,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
     }
 
     if (isLeftImage){
-        map_left.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
+        map_left.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false, false);
 
         //if ((map_left.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
         /*if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
@@ -364,7 +370,7 @@ Sophus::SE3d VisualSLAM::performFrontEndStepWithTracking(cv::Mat image, cv::Mat 
             BA.performBAWithKeyFrames(map_left, keyFrameStep, numKeyFrames);
         }*/
     } else {
-        map_right.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false);
+        map_right.updateDataCurrentFrame(pose, trackedCurrFramePoints, trackedPointIndices, trackedPoints3DCurrentFrame, false, true);
 
         //if ((map_right.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
         if ((map_right.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_right.getCurrentCameraIndex() > 0){
