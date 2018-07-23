@@ -31,7 +31,7 @@ void VisualOdometry::setKeyFrameKeypoints(std::vector<cv::KeyPoint> updatedKeypo
 }
 
 void VisualOdometry::extractORBFeatures(cv::Mat frame_new, std::vector<cv::KeyPoint>& keypoints_new, cv::Mat& descriptors_new){
-    int max_features = 2000;
+    int max_features = 200;
 	// Detect ORB features and compute descriptors.
     cv::Ptr<cv::Feature2D> orb = cv::ORB::create(max_features);
     orb->detect(frame_new, keypoints_new);

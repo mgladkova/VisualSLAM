@@ -93,7 +93,7 @@ bool BundleAdjuster::performBAWithKeyFrames(Map& map_left, Map& map_right, int k
     ceres::Problem problem;
     ceres::LossFunction* loss_function = new ceres::HuberLoss(2.0);
     double baseline = 0.53716;
-    double confid = 1e2;
+    double confid = 1e3;
     Eigen::Matrix<double, 7, 7> information_matrix = Eigen::MatrixXd::Identity(7, 7)*confid;
 
     for (int i = startFrame; i < currentCameraIndex; i += keyFrameStep){

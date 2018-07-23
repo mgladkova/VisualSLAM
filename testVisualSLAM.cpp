@@ -37,8 +37,8 @@ int main(int argc, char** argv){
     cv::Mat prevImageLeft, prevImageRight;
     std::vector<cv::Point2f> pointsCurrentFrame_left, pointsPrevFrame_left;
     std::vector<cv::Point2f> pointsCurrentFrame_right, pointsPrevFrame_right;
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
+    std::vector<cv::KeyPoint> keypoints_left, keypoints_right;
+    cv::Mat descriptors_left,descriptors_right;
     Eigen::Matrix3d cumR = Eigen::Matrix3d::Identity();
 
     int k = 1;
@@ -84,6 +84,9 @@ int main(int argc, char** argv){
 
         Sophus::SE3d pose_left = slam.performFrontEndStepWithTracking(images_left[i], disparity_map, pointsCurrentFrame_left, pointsPrevFrame_left, prevImageLeft, true);
         Sophus::SE3d pose_right = slam.performFrontEndStepWithTracking(images_right[i], disparity_map, pointsCurrentFrame_right, pointsPrevFrame_right, prevImageRight, false);
+        //Sophus::SE3d pose_left = slam.performFrontEndStep(images_left[i], disparity_map, keypoints_left, descriptors_left, true);
+        //Sophus::SE3d pose_right = slam.performFrontEndStep(images_right[i], disparity_map, keypoints_right, descriptors_right, false);
+
         visToolkit->plot2DPoints(images_right[i], pointsCurrentFrame_right);
 
         visToolkit->setDataForPointCloudVisualization(images_left[i], disparity_map);

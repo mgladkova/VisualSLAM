@@ -219,18 +219,34 @@ void VisualSLAM::readGroundTruthData(std::string fileName, int numberFrames, std
     this->groundTruthData = groundTruthData;
 }
 
-Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat disparityCurrentFrame, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame){
+Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image, cv::Mat disparityCurrentFrame, std::vector<cv::KeyPoint>& keyPointsPrevFrame, cv::Mat& descriptorsPrevFrame, bool isLeftImage){
     cv::Mat descriptorsCurrentFrame;
     std::vector<cv::KeyPoint> keyPointsCurrentFrame;
 
-    VO.extractORBFeatures(image_left, keyPointsCurrentFrame, descriptorsCurrentFrame);
+    VO.extractORBFeatures(image, keyPointsCurrentFrame, descriptorsCurrentFrame);
 
     Sophus::SE3d pose;
     if (keyPointsPrevFrame.empty()){
-      keyPointsPrevFrame = keyPointsCurrentFrame;
-      descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
+        std::vector<cv::Point2f> p2d_currFrame;
+        for (auto kpt: keyPointsCurrentFrame){
+            p2d_currFrame.push_back(kpt.pt);
+        }
+        std::vector<uchar> validPoints3D;
+        std::vector<cv::Point3f> p3d_currFrame = VO.get3DCoordinates(p2d_currFrame, disparityCurrentFrame, K, validPoints3D);
 
-      return pose;
+        std::vector<int> indices(p2d_currFrame.size());
+        std::iota(indices.begin(), indices.end(), 0);
+
+        if (isLeftImage){
+            map_left.updateDataCurrentFrame(pose, p2d_currFrame, indices, p3d_currFrame, true, false);
+        } else {
+            map_right.updateDataCurrentFrame(pose, p2d_currFrame, indices, p3d_currFrame, true, true);
+        }
+
+        keyPointsPrevFrame = keyPointsCurrentFrame;
+        descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
+
+        return pose;
     }
 
     std::vector<cv::DMatch> matches = VO.findGoodORBFeatureMatches(keyPointsPrevFrame, keyPointsCurrentFrame, descriptorsPrevFrame, descriptorsCurrentFrame);
@@ -242,9 +258,48 @@ Sophus::SE3d VisualSLAM::performFrontEndStep(cv::Mat image_left, cv::Mat dispari
     std::vector<uchar> validPoints3D;
     std::vector<cv::Point3f> p3d_currFrame = VO.get3DCoordinates(p2d_currFrame, disparityCurrentFrame, K, validPoints3D);
 
-    std::vector<int> indices;
+    std::vector<cv::Point2f> trackedPrevFramePoints, trackedCurrFramePoints;
+    std::vector<cv::Point3f> trackedPoints3DCurrentFrame;
 
-    VO.estimatePose3D2D(p3d_currFrame, p2d_prevFrame, p2d_currFrame, indices, K, pose);
+    for (int i = 0; i < validPoints3D.size(); i++){
+        if (validPoints3D[i] && checkPoint2DCoordinates(p2d_currFrame[i], image)){
+            trackedPrevFramePoints.push_back(p2d_prevFrame[i]);
+            trackedCurrFramePoints.push_back(p2d_currFrame[i]);
+            trackedPoints3DCurrentFrame.push_back(p3d_currFrame[i]);
+        }
+    }
+
+    std::vector<int> trackedPointIndices_dummy(trackedCurrFramePoints.size());
+    std::iota(trackedPointIndices_dummy.begin(), trackedPointIndices_dummy.end(), 0);
+
+    VO.estimatePose3D2D(trackedPoints3DCurrentFrame, trackedPrevFramePoints, trackedCurrFramePoints, trackedPointIndices_dummy, K, pose);
+
+    std::vector<int> indices(trackedCurrFramePoints.size());
+    std::iota(indices.begin(), indices.end(), 0);
+
+
+    int keyFrameStep = 3;
+    int numKeyFrames = 20;
+
+    if (isLeftImage){
+        map_left.updateDataCurrentFrame(pose, trackedCurrFramePoints, indices, trackedPoints3DCurrentFrame, true, false);
+
+        //if ((map_left.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
+        /*if ((map_left.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_left.getCurrentCameraIndex() > 0){
+            std::string fileName = "BAFile" + std::to_string(map_left.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "L.txt";
+            map_left.writeBAFile(fileName, keyFrameStep, numKeyFrames);
+            BA.performBAWithKeyFrames(map_left, keyFrameStep, numKeyFrames);
+        }*/
+    } else {
+        map_right.updateDataCurrentFrame(pose, trackedCurrFramePoints, indices, trackedPoints3DCurrentFrame, true, true);
+
+        //if ((map_right.getCurrentCameraIndex() - numKeyFrames*keyFrameStep) >= 0){
+        if ((map_right.getCurrentCameraIndex() % (numKeyFrames*keyFrameStep)) == 0 && map_right.getCurrentCameraIndex() > 0){
+            std::string fileName = "BAFile" + std::to_string(map_right.getCurrentCameraIndex() / (numKeyFrames*keyFrameStep)) + "R.txt";
+            //map_right.writeBAFile(fileName, keyFrameStep, numKeyFrames);
+            BA.performBAWithKeyFrames(map_left, map_right, keyFrameStep, numKeyFrames);
+        }
+    }
 
     descriptorsCurrentFrame.copyTo(descriptorsPrevFrame);
 
